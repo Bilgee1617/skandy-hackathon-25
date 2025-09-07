@@ -45,33 +45,29 @@ const toISODateString = (date: Date) => date.toISOString().split('T')[0];
 const formatDisplayDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
-    // Adjust for timezone to prevent off-by-one day errors
     const userTimezoneOffset = date.getTimezoneOffset() * 60000;
     const correctedDate = new Date(date.getTime() + userTimezoneOffset);
-    const month = correctedDate.getMonth() + 1;
-    const day = correctedDate.getDate();
+    const month = String(correctedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(correctedDate.getDate()).padStart(2, '0');
     const year = correctedDate.getFullYear();
-    return `${month}/${day}/${year}`;
+    return `${month}-${day}-${year}`;
 };
 
 export default function IngredientsScreen() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(false);
   
-  // Edit Modal State
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
   const [editQuantity, setEditQuantity] = useState('');
   const [editUnit, setEditUnit] = useState('');
 
-  // Add Modal State
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemQuantity, setNewItemQuantity] = useState('');
   const [newItemUnit, setNewItemUnit] = useState('');
   const [newItemExpDate, setNewItemExpDate] = useState('');
   const [newItemBoughtOn, setNewItemBoughtOn] = useState('');
-
 
   useEffect(() => {
     fetchIngredients();
@@ -80,20 +76,12 @@ export default function IngredientsScreen() {
   const fetchIngredients = async () => {
     if(loading) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('ingredients')
-      .select('*')
-      .order('expiration_date', { ascending: true, nullsFirst: false });
-
-    if (error) {
-      Alert.alert('Error fetching ingredients', error.message);
-    } else {
-      setIngredients(data as Ingredient[]);
-    }
+    const { data, error } = await supabase.from('ingredients').select('*').order('expiration_date', { ascending: true, nullsFirst: false });
+    if (error) Alert.alert('Error fetching ingredients', error.message);
+    else setIngredients(data as Ingredient[]);
     setLoading(false);
   };
 
-  // --- Edit Handlers ---
   const handleOpenEditModal = (ingredient: Ingredient) => {
     setSelectedIngredient(ingredient);
     setEditQuantity(ingredient.quantity.toString());
@@ -101,22 +89,17 @@ export default function IngredientsScreen() {
     setEditModalVisible(true);
   };
 
-  const handleCloseEditModal = () => {
-    setEditModalVisible(false);
-  };
+  const handleCloseEditModal = () => setEditModalVisible(false);
 
   const handleSaveEdit = async () => {
     if (!selectedIngredient) return;
-
     const quantityValue = parseFloat(editQuantity);
     if (isNaN(quantityValue) || quantityValue < 0) {
         Alert.alert('Invalid Quantity', 'Please enter a valid, non-negative number.');
         return;
     }
-
     setLoading(true);
     let error;
-
     if (quantityValue <= 0) {
         const { error: deleteError } = await supabase.from('ingredients').delete().eq('id', selectedIngredient.id);
         error = deleteError;
@@ -124,17 +107,11 @@ export default function IngredientsScreen() {
         const { error: updateError } = await supabase.from('ingredients').update({ quantity: quantityValue, unit: editUnit }).eq('id', selectedIngredient.id);
         error = updateError;
     }
-
-    if (error) {
-      Alert.alert('Error saving ingredient', error.message);
-    } else {
-        await fetchIngredients();
-        handleCloseEditModal();
-    }
+    if (error) Alert.alert('Error saving ingredient', error.message);
+    else { await fetchIngredients(); handleCloseEditModal(); }
     setLoading(false);
   };
 
-  // --- Add Handlers ---
   const handleOpenAddModal = () => {
       setNewItemName('');
       setNewItemQuantity('1');
@@ -144,9 +121,7 @@ export default function IngredientsScreen() {
       setAddModalVisible(true);
   };
 
-  const handleCloseAddModal = () => {
-      setAddModalVisible(false);
-  };
+  const handleCloseAddModal = () => setAddModalVisible(false);
 
   const handleAddItem = async () => {
     if (!newItemName.trim()) {
@@ -155,16 +130,14 @@ export default function IngredientsScreen() {
     }
     const quantityValue = parseFloat(newItemQuantity);
     if (isNaN(quantityValue) || quantityValue <= 0) {
-        Alert.alert('Invalid Quantity', 'Please enter a valid, positive number for the quantity.');
+        Alert.alert('Invalid Quantity', 'Please enter a valid, positive number.');
         return;
     }
-
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
         Alert.alert('Not Authenticated', 'You must be logged in to add an ingredient.');
         return;
     }
-
     setLoading(true);
     const { error } = await supabase.from('ingredients').insert([{
         name: newItemName.trim(),
@@ -172,19 +145,13 @@ export default function IngredientsScreen() {
         unit: newItemUnit.trim(),
         expiration_date: newItemExpDate || null,
         bought_on: newItemBoughtOn || toISODateString(new Date()),
-        user_id: session.user.id, // Associate ingredient with the logged-in user
+        user_id: session.user.id,
     }]);
-
-    if (error) {
-        Alert.alert('Error adding ingredient', error.message);
-    } else {
-        await fetchIngredients();
-        handleCloseAddModal();
-    }
+    if (error) Alert.alert('Error adding ingredient', error.message);
+    else { await fetchIngredients(); handleCloseAddModal(); }
     setLoading(false);
   }
 
-  // --- Render Functions ---
   const renderItem = ({ item }: { item: Ingredient }) => {
     const expiration = getExpirationInfo(item.expiration_date);
     return (
@@ -215,16 +182,7 @@ export default function IngredientsScreen() {
             <Text style={styles.title}>Your Pantry</Text>
             <Text style={styles.subtitle}>What's fresh and what's... not so fresh?</Text>
         </View>
-      <FlatList
-        data={ingredients}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        onRefresh={fetchIngredients}
-        refreshing={loading}
-        ListEmptyComponent={renderEmptyState}
-        contentContainerStyle={ingredients.length === 0 ? styles.flexOne : styles.listContent}
-        keyboardShouldPersistTaps="handled"
-      />
+        <FlatList data={ingredients} renderItem={renderItem} keyExtractor={(item) => item.id} onRefresh={fetchIngredients} refreshing={loading} ListEmptyComponent={renderEmptyState} contentContainerStyle={ingredients.length === 0 ? styles.flexOne : styles.listContent} />
 
         <View style={styles.addButtonContainer}>
             <TouchableOpacity style={styles.addButton} onPress={handleOpenAddModal}>
@@ -235,68 +193,48 @@ export default function IngredientsScreen() {
 
       {/* --- Edit Quantity Modal --- */}
       <Modal animationType="slide" transparent={true} visible={editModalVisible} onRequestClose={handleCloseEditModal}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOne}>
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>{selectedIngredient?.name}</Text>
-                    <View style={styles.inputRow}>
-                        <TextInput style={styles.quantityInput} onChangeText={setEditQuantity} value={editQuantity} keyboardType="numeric" placeholder="Quantity"/>
-                        <TextInput style={styles.unitInput} onChangeText={setEditUnit} value={editUnit} placeholder="Unit" autoCapitalize="none"/>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={handleCloseEditModal}>
+            <TouchableWithoutFeedback>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOneJustifyEnd}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>{selectedIngredient?.name}</Text>
+                        <View style={styles.inputRow}>
+                            <TextInput style={[styles.modalInput, styles.quantityInput]} onChangeText={setEditQuantity} value={editQuantity} keyboardType="numeric" placeholder="Quantity"/>
+                            <TextInput style={[styles.modalInput, styles.unitInput]} onChangeText={setEditUnit} value={editUnit} placeholder="Unit" autoCapitalize="none"/>
+                        </View>
+                        <View style={styles.quickActionsContainer}>
+                            <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(Math.max(0, parseFloat(q || '0') - 1)))}><Text style={styles.quickActionButtonText}>-1</Text></TouchableOpacity>
+                            <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity('0' )}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
+                            <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
+                        </View>
+                        <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={loading}><Text style={styles.buttonText}>Save</Text></TouchableOpacity>
+                        <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseEditModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
                     </View>
-                    <View style={styles.quickActionsContainer}>
-                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(Math.max(0, parseFloat(q || '0') - 1)))}><Text style={styles.quickActionButtonText}>-1</Text></TouchableOpacity>
-                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity('0' )}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
-                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
-                    </View>
-                    <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={loading}><Text style={styles.buttonText}>Save</Text></TouchableOpacity>
-                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseEditModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
-                </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
+                </KeyboardAvoidingView>
+            </TouchableWithoutFeedback>
+        </TouchableOpacity>
       </Modal>
 
       {/* --- Add Ingredient Modal --- */}
       <Modal animationType="slide" transparent={true} visible={addModalVisible} onRequestClose={handleCloseAddModal}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOne}>
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>Add New Ingredient</Text>
-                    
-                    <View style={styles.modalInputContainer}>
-                        <Ionicons name="pricetag-outline" size={20} color="#666" style={styles.inputIcon} />
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={handleCloseAddModal}>
+            <TouchableWithoutFeedback>
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOneJustifyEnd}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Add New Ingredient</Text>
                         <TextInput style={styles.modalInput} placeholder="Ingredient Name (e.g., Milk)" value={newItemName} onChangeText={setNewItemName} />
-                    </View>
-
-                    <View style={styles.inputRow}>
-                        <View style={[styles.modalInputContainer, styles.quantityInput]}>
-                            <Ionicons name="apps-outline" size={20} color="#666" style={styles.inputIcon} />
-                            <TextInput style={styles.modalInput} placeholder="Quantity" value={newItemQuantity} onChangeText={setNewItemQuantity} keyboardType="numeric"/>
+                        <View style={styles.inputRow}>
+                            <TextInput style={[styles.modalInput, {flex: 2, marginRight: 10}]} placeholder="Quantity" value={newItemQuantity} onChangeText={setNewItemQuantity} keyboardType="numeric"/>
+                            <TextInput style={[styles.modalInput, {flex: 1}]} placeholder="Unit (e.g., L, g)" value={newItemUnit} onChangeText={setNewItemUnit} autoCapitalize="none"/>
                         </View>
-                        <View style={[styles.modalInputContainer, styles.unitInput]}>
-                             <Ionicons name="options-outline" size={20} color="#666" style={styles.inputIcon} />
-                            <TextInput style={styles.modalInput} placeholder="Unit" value={newItemUnit} onChangeText={setNewItemUnit} autoCapitalize="none"/>
-                        </View>
+                        <TextInput style={styles.modalInput} placeholder="Expiration Date (MM-DD-YYYY)" value={newItemExpDate} onChangeText={setNewItemExpDate} />
+                        <TextInput style={styles.modalInput} placeholder="Bought On Date (MM-DD-YYYY)" value={newItemBoughtOn} onChangeText={setNewItemBoughtOn} />
+                        <TouchableOpacity style={styles.button} onPress={handleAddItem} disabled={loading}><Text style={styles.buttonText}>Add to Pantry</Text></TouchableOpacity>
+                        <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseAddModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
                     </View>
-
-                    <View style={styles.modalInputContainer}>
-                        <Ionicons name="calendar-outline" size={20} color="#666" style={styles.inputIcon} />
-                        <TextInput style={styles.modalInput} placeholder="Expiration Date (YYYY-MM-DD)" value={newItemExpDate} onChangeText={setNewItemExpDate} />
-                    </View>
-
-                    <View style={styles.modalInputContainer}>
-                        <Ionicons name="today-outline" size={20} color="#666" style={styles.inputIcon} />
-                        <TextInput style={styles.modalInput} placeholder="Bought On (YYYY-MM-DD)" value={newItemBoughtOn} onChangeText={setNewItemBoughtOn} />
-                    </View>
-                    
-                    <TouchableOpacity style={styles.button} onPress={handleAddItem} disabled={loading}><Text style={styles.buttonText}>Add to Pantry</Text></TouchableOpacity>
-                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseAddModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
-                </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </KeyboardAvoidingView>
+                </KeyboardAvoidingView>
+            </TouchableWithoutFeedback>
+        </TouchableOpacity>
       </Modal>
 
     </SafeAreaView>
@@ -305,6 +243,7 @@ export default function IngredientsScreen() {
 
 const styles = StyleSheet.create({
   flexOne: { flex: 1 },
+  flexOneJustifyEnd: { flex: 1, justifyContent: 'flex-end' },
   container: { flex: 1, backgroundColor: '#fff' },
   header: { padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee' },
   title: { fontSize: 28, fontWeight: 'bold', color: '#333' },
@@ -322,10 +261,8 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 3, paddingBottom: 30 },
   modalTitle: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
-  modalInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f2f2f2', borderRadius: 10, marginBottom: 12, paddingHorizontal: 15 },
-  inputIcon: { marginRight: 10 },
-  modalInput: { flex: 1, height: 50, fontSize: 16, color: '#333' },
-  inputRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  modalInput: { backgroundColor: '#f2f2f2', borderRadius: 10, padding: 15, fontSize: 16, marginBottom: 12, width: '100%' },
+  inputRow: { flexDirection: 'row', marginBottom: 12, width: '100%' },
   quantityInput: { flex: 2, marginRight: 10 },
   unitInput: { flex: 1 },
   quickActionsContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
