@@ -4,6 +4,99 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { getRecipeRecommendations, getMockRecipeRecommendations, Recipe, Ingredient, RecipeRecommendation } from '../../lib/recipeService';
 
+// Function to get recipe theme based on recipe name/type
+const getRecipeTheme = (recipeName: string) => {
+  const name = recipeName.toLowerCase();
+  
+  // Breakfast recipes
+  if (name.includes('pancake') || name.includes('waffle') || name.includes('breakfast')) {
+    return {
+      emoji: '🥞',
+      gradient: ['#FFE4B5', '#FFD700'],
+      accentColor: '#FF8C00',
+      textColor: '#8B4513'
+    };
+  }
+  
+  // Italian recipes
+  if (name.includes('pasta') || name.includes('pizza') || name.includes('italian') || name.includes('spaghetti')) {
+    return {
+      emoji: '🍝',
+      gradient: ['#FFE4E1', '#FFB6C1'],
+      accentColor: '#DC143C',
+      textColor: '#8B0000'
+    };
+  }
+  
+  // Asian recipes
+  if (name.includes('stir') || name.includes('fried') || name.includes('asian') || name.includes('noodle')) {
+    return {
+      emoji: '🥢',
+      gradient: ['#FFF8DC', '#F0E68C'],
+      accentColor: '#FF6347',
+      textColor: '#B8860B'
+    };
+  }
+  
+  // Mexican recipes
+  if (name.includes('taco') || name.includes('burrito') || name.includes('mexican') || name.includes('salsa')) {
+    return {
+      emoji: '🌮',
+      gradient: ['#FFE4B5', '#FFA500'],
+      accentColor: '#FF4500',
+      textColor: '#8B4513'
+    };
+  }
+  
+  // Salad recipes
+  if (name.includes('salad') || name.includes('green') || name.includes('fresh')) {
+    return {
+      emoji: '🥗',
+      gradient: ['#F0FFF0', '#90EE90'],
+      accentColor: '#228B22',
+      textColor: '#006400'
+    };
+  }
+  
+  // Soup recipes
+  if (name.includes('soup') || name.includes('broth') || name.includes('stew')) {
+    return {
+      emoji: '🍲',
+      gradient: ['#FFF8DC', '#DEB887'],
+      accentColor: '#CD853F',
+      textColor: '#8B4513'
+    };
+  }
+  
+  // Dessert recipes
+  if (name.includes('cake') || name.includes('cookie') || name.includes('dessert') || name.includes('sweet')) {
+    return {
+      emoji: '🍰',
+      gradient: ['#FFE4E1', '#FFB6C1'],
+      accentColor: '#FF69B4',
+      textColor: '#8B008B'
+    };
+  }
+  
+  // Smoothie/Juice recipes
+  if (name.includes('smoothie') || name.includes('juice') || name.includes('drink')) {
+    return {
+      emoji: '🥤',
+      gradient: ['#E6E6FA', '#DDA0DD'],
+      accentColor: '#9370DB',
+      textColor: '#4B0082'
+    };
+  }
+  
+  // Default theme
+  return {
+    emoji: '🍽️',
+    gradient: ['#F5F5F5', '#E0E0E0'],
+    accentColor: '#666666',
+    textColor: '#333333'
+  };
+};
+
 export default function RecipesScreen() {
   const [recommendations, setRecommendations] = useState<RecipeRecommendation | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,46 +156,58 @@ export default function RecipesScreen() {
     loadRecipeRecommendations();
   }, []);
 
-  const renderRecipeCard = (recipe: Recipe) => (
-    <TouchableOpacity 
-      key={recipe.name}
-      style={styles.recipeCard}
-      onPress={() => setSelectedRecipe(recipe)}
-    >
-      <View style={styles.recipeHeader}>
-        <Text style={styles.recipeName}>{recipe.name}</Text>
-        <View style={styles.recipeMeta}>
-          <Text style={styles.recipeCategory}>{recipe.category}</Text>
-          <Text style={styles.recipeDifficulty}>{recipe.difficulty}</Text>
+  const renderRecipeCard = (recipe: Recipe) => {
+    const theme = getRecipeTheme(recipe.name);
+    
+    return (
+      <TouchableOpacity 
+        key={recipe.name}
+        style={[styles.recipeCard, { backgroundColor: theme.gradient[0] }]}
+        onPress={() => setSelectedRecipe(recipe)}
+      >
+        <View style={styles.recipeCardContent}>
+          <View style={styles.recipeHeader}>
+            <View style={styles.recipeIconContainer}>
+              <Text style={styles.recipeEmoji}>{theme.emoji}</Text>
+            </View>
+            <View style={styles.recipeInfo}>
+              <Text style={[styles.recipeName, { color: theme.textColor }]}>{recipe.name}</Text>
+              <View style={styles.recipeMeta}>
+                <Text style={[styles.recipeCategory, { color: theme.accentColor }]}>{recipe.category}</Text>
+                <Text style={[styles.recipeDifficulty, { color: theme.accentColor }]}>{recipe.difficulty}</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.accentColor} />
+          </View>
+          
+          <Text style={[styles.recipeDescription, { color: theme.textColor }]}>{recipe.description}</Text>
+          
+          <View style={[styles.recipeStats, { backgroundColor: theme.gradient[1] }]}>
+            <View style={styles.statItem}>
+              <Ionicons name="time-outline" size={16} color={theme.accentColor} />
+              <Text style={[styles.statText, { color: theme.textColor }]}>{recipe.prepTime}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="restaurant-outline" size={16} color={theme.accentColor} />
+              <Text style={[styles.statText, { color: theme.textColor }]}>{recipe.servings} servings</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="flame-outline" size={16} color={theme.accentColor} />
+              <Text style={[styles.statText, { color: theme.textColor }]}>{recipe.cookTime}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.ingredientsPreview}>
+            <Text style={[styles.ingredientsLabel, { color: theme.textColor }]}>Key ingredients:</Text>
+            <Text style={[styles.ingredientsText, { color: theme.textColor }]}>
+              {recipe.ingredients.slice(0, 3).join(', ')}
+              {recipe.ingredients.length > 3 && ` +${recipe.ingredients.length - 3} more`}
+            </Text>
+          </View>
         </View>
-      </View>
-      
-      <Text style={styles.recipeDescription}>{recipe.description}</Text>
-      
-      <View style={styles.recipeStats}>
-        <View style={styles.statItem}>
-          <Ionicons name="time-outline" size={16} color="#666" />
-          <Text style={styles.statText}>{recipe.prepTime}</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Ionicons name="restaurant-outline" size={16} color="#666" />
-          <Text style={styles.statText}>{recipe.servings} servings</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Ionicons name="flame-outline" size={16} color="#666" />
-          <Text style={styles.statText}>{recipe.cookTime}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.ingredientsPreview}>
-        <Text style={styles.ingredientsLabel}>Key ingredients:</Text>
-        <Text style={styles.ingredientsText}>
-          {recipe.ingredients.slice(0, 3).join(', ')}
-          {recipe.ingredients.length > 3 && ` +${recipe.ingredients.length - 3} more`}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderRecipeDetail = (recipe: Recipe) => (
     <View style={styles.recipeDetail}>
@@ -288,23 +393,42 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   recipeCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    overflow: 'hidden',
+  },
+  recipeCardContent: {
+    padding: 16,
+  },
+  recipeIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+  },
+  recipeEmoji: {
+    fontSize: 24,
+  },
+  recipeInfo: {
+    flex: 1,
   },
   recipeHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 12,
   },
   recipeName: {
     fontSize: 18,
@@ -340,6 +464,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
   },
   statItem: {
     flexDirection: 'row',
@@ -351,9 +477,10 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   ingredientsPreview: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: 12,
     padding: 12,
+    marginTop: 8,
   },
   ingredientsLabel: {
     fontSize: 12,
