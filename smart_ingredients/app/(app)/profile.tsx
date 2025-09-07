@@ -1,146 +1,154 @@
 
 import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../../lib/supabase';
-import { Session } from '@supabase/supabase-js';
-import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { 
+    StyleSheet, View, Text, Alert, 
+    SafeAreaView, TextInput, TouchableOpacity
+} from 'react-native';
+import { User } from '@supabase/supabase-js';
 
 export default function ProfileScreen() {
-  const [session, setSession] = useState<Session | null>(null);
-  const router = useRouter();
+    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState<User | null>(null);
+    const [username, setUsername] = useState('');
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
+    useEffect(() => {
+        const fetchUserAndProfile = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                setUser(session.user);
+                getProfile(session.user);
+            } else {
+                setLoading(false);
+            }
+        };
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
+        fetchUserAndProfile();
+    }, []);
 
-    return () => subscription.unsubscribe();
-  }, []);
+    const getProfile = async (user: User) => {
+        try {
+            setLoading(true);
+            const { data, error, status } = await supabase
+                .from('profiles')
+                .select(`username`)
+                .eq('id', user.id)
+                .single();
 
-  const handleLogout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      Alert.alert('Error', error.message);
-    } else {
-      router.replace('/login');
-    }
-  };
+            if (error && status !== 406) {
+                throw error;
+            }
 
-  const getInitials = (email: string) => {
-    return email ? email.substring(0, 2).toUpperCase() : '';
-  };
+            if (data) {
+                setUsername(data.username || '');
+            }
+        } catch (error) {
+            if (error instanceof Error) {
+                Alert.alert('Error fetching profile', error.message);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="auto" />
-        <View style={styles.header}>
-            <Text style={styles.title}>Profile</Text>
-            <Text style={styles.subtitle}>Manage your account and preferences</Text>
-        </View>
+    const updateProfile = async () => {
+        if (!user) return;
+        try {
+            setLoading(true);
+            const updates = {
+                id: user.id,
+                username,
+                updated_at: new Date(),
+            };
+            const { error } = await supabase.from('profiles').upsert(updates);
+            if (error) {
+                throw error;
+            }
+            Alert.alert('Success', 'Profile updated successfully!');
+        } catch (error) {
+            if (error instanceof Error) {
+                Alert.alert('Error updating profile', error.message);
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
 
-      <View style={styles.content}>
-        {session && (
-            <View style={styles.userInfoSection}>
-                <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{getInitials(session.user.email!)}</Text>
+    return (
+        <SafeAreaView style={styles.container}>
+            <View style={styles.content}>
+                <Text style={styles.title}>Your Profile</Text>
+                {user?.email && <Text style={styles.email}>{user.email}</Text>}
+
+                <View style={styles.inputContainer}>
+                    <Text style={styles.label}>Username</Text>
+                    <TextInput
+                        style={styles.input}
+                        onChangeText={setUsername}
+                        value={username}
+                        placeholder="Your public username"
+                        autoCapitalize="none"
+                        placeholderTextColor="#888"
+                    />
                 </View>
-                <Text style={styles.email}>{session.user.email}</Text>
+
+                <TouchableOpacity style={styles.button} onPress={updateProfile} disabled={loading}>
+                    <Text style={styles.buttonText}>{loading ? 'Saving...' : 'Save Changes'}</Text>
+                </TouchableOpacity>
             </View>
-        )}
-
-        <TouchableOpacity style={styles.button} onPress={() => Alert.alert('Feedback', 'This feature is coming soon!')}>
-            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#007AFF" />
-            <Text style={styles.buttonText}>Leave Feedback</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={[styles.button, styles.logoutButton]} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={22} color="#FF3B30" />
-            <Text style={[styles.buttonText, styles.logoutButtonText]}>Log Out</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
-  );
+        </SafeAreaView>
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    padding: 20,
-    paddingTop: 30, 
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 5,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  userInfoSection: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  avatarText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: 'bold',
-  },
-  email: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#333',
-  },
-  button: {
-    backgroundColor: '#f9f9f9',
-    padding: 15,
-    borderRadius: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-    marginLeft: 10,
-  },
-  logoutButton: {
-    backgroundColor: '#fff',
-    borderColor: '#FF3B30',
-  },
-  logoutButtonText: {
-    color: '#FF3B30',
-  },
+    container: {
+        flex: 1,
+        backgroundColor: '#fff',
+    },
+    content: {
+        flex: 1,
+        alignItems: 'center',
+        padding: 20,
+        paddingTop: 40,
+    },
+    title: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 10,
+    },
+    email: {
+        fontSize: 16,
+        color: '#666',
+        marginBottom: 30,
+    },
+    inputContainer: {
+        width: '100%',
+        marginBottom: 20,
+    },
+    label: {
+        fontSize: 16,
+        color: '#666',
+        marginBottom: 8,
+    },
+    input: {
+        backgroundColor: '#f2f2f2',
+        borderRadius: 10,
+        padding: 15,
+        fontSize: 16,
+        width: '100%',
+    },
+    button: {
+        backgroundColor: '#007AFF',
+        width: '100%',
+        padding: 15,
+        borderRadius: 10,
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    buttonText: {
+        color: 'white',
+        fontSize: 18,
+        fontWeight: '600',
+    },
 });
