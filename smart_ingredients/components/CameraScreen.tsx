@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView, ActivityIndicator } from 'react-native';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { extractTextFromReceipt, extractTextFromReceiptMock, OCRResult } from '../lib/ocrService';
 
 interface CameraScreenProps {
   onClose: () => void;
@@ -13,6 +14,7 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
   const [cameraType, setCameraType] = useState<CameraType>('back');
   const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
   const [isScanning, setIsScanning] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState<string>('');
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
@@ -28,7 +30,6 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
   const takePicture = async () => {
     if (cameraRef.current) {
       try {
-        setIsScanning(true);
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.8,
         });
@@ -40,8 +41,6 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
       } catch (error) {
         console.error('Error taking picture:', error);
         Alert.alert('Error', 'Failed to take picture. Please try again.');
-      } finally {
-        setIsScanning(false);
       }
     }
   };
@@ -66,21 +65,115 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
 
   const processReceiptImage = async (imageUri: string) => {
     try {
-      // For now, we'll simulate OCR processing
-      // In a real implementation, you would use a service like Google Vision API, AWS Textract, or similar
+      setIsScanning(true);
+      setOcrStatus('Processing image...');
+      
+      // Simulate processing time for better UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setOcrStatus('Extracting text...');
+      
+      // Use mock OCR for now (you can switch to real OCR later)
+      const ocrResult: OCRResult = await extractTextFromReceiptMock(imageUri);
+      
+      setOcrStatus('Analyzing ingredients...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Use the ingredients already extracted by the OCR service
+      const allIngredients = ocrResult.ingredients;
+      
+      setOcrStatus('Complete!');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Show results
+      if (allIngredients.length > 0) {
+        const ingredientsList = allIngredients.join('\n• ');
+        Alert.alert(
+          'Ingredients Found!',
+          `Found ${allIngredients.length} ingredients:\n\n• ${ingredientsList}`,
+          [
+            {
+              text: 'Add to Inventory',
+              onPress: () => {
+                // TODO: Add ingredients to Supabase database
+                console.log('Adding ingredients to inventory:', allIngredients);
+                onClose();
+              },
+            },
+            {
+              text: 'View Raw Text',
+              onPress: () => {
+                Alert.alert(
+                  'Raw OCR Text',
+                  ocrResult.text,
+                  [
+                    { text: 'OK' },
+                    {
+                      text: 'Add Ingredients',
+                      onPress: () => {
+                        console.log('Adding ingredients to inventory:', allIngredients);
+                        onClose();
+                      },
+                    },
+                  ]
+                );
+              },
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+              onPress: () => onClose(),
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'No Ingredients Found',
+          'We couldn\'t identify any ingredients in this receipt. You can view the raw text to see what was detected.',
+          [
+            {
+              text: 'View Raw Text',
+              onPress: () => {
+                Alert.alert(
+                  'Raw OCR Text',
+                  ocrResult.text || 'No text detected',
+                  [{ text: 'OK' }]
+                );
+              },
+            },
+            {
+              text: 'OK',
+              onPress: () => onClose(),
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Error processing receipt:', error);
+      setOcrStatus('Error occurred');
+      
+      // Show more specific error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       Alert.alert(
-        'Receipt Processed',
-        'Receipt has been scanned! In a real implementation, this would extract ingredients from the receipt text.',
+        'Processing Error', 
+        `Failed to process receipt: ${errorMessage}\n\nPlease try again with a clearer image.`,
         [
           {
-            text: 'OK',
+            text: 'Try Again',
+            onPress: () => {
+              setIsScanning(false);
+              setOcrStatus('');
+            },
+          },
+          {
+            text: 'Cancel',
+            style: 'cancel',
             onPress: () => onClose(),
           },
         ]
       );
-    } catch (error) {
-      console.error('Error processing receipt:', error);
-      Alert.alert('Error', 'Failed to process receipt. Please try again.');
+    } finally {
+      setIsScanning(false);
+      setOcrStatus('');
     }
   };
 
@@ -141,16 +234,26 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
 
           {/* Scanning Area */}
           <View style={styles.scanningArea}>
-            <View style={styles.scanFrame}>
-              <View style={[styles.corner, styles.topLeft]} />
-              <View style={[styles.corner, styles.topRight]} />
-              <View style={[styles.corner, styles.bottomLeft]} />
-              <View style={[styles.corner, styles.bottomRight]} />
+            <View style={[styles.scanFrame, isScanning && styles.scanFrameActive]}>
+              <View style={[styles.corner, styles.topLeft, isScanning && styles.cornerActive]} />
+              <View style={[styles.corner, styles.topRight, isScanning && styles.cornerActive]} />
+              <View style={[styles.corner, styles.bottomLeft, isScanning && styles.cornerActive]} />
+              <View style={[styles.corner, styles.bottomRight, isScanning && styles.cornerActive]} />
             </View>
             <Text style={styles.scanInstruction}>
-              Position the receipt within the frame
+              {isScanning ? 'Processing receipt...' : 'Position the receipt within the frame'}
             </Text>
           </View>
+
+          {/* OCR Status Indicator */}
+          {isScanning && (
+            <View style={styles.ocrStatusContainer}>
+              <View style={styles.ocrStatusBox}>
+                <ActivityIndicator size="small" color="#007AFF" />
+                <Text style={styles.ocrStatusText}>{ocrStatus}</Text>
+              </View>
+            </View>
+          )}
 
           {/* Bottom Controls */}
           <View style={styles.bottomControls}>
@@ -261,12 +364,19 @@ const styles = StyleSheet.create({
     height: 200,
     position: 'relative',
   },
+  scanFrameActive: {
+    opacity: 0.8,
+  },
   corner: {
     position: 'absolute',
     width: 30,
     height: 30,
     borderColor: '#007AFF',
     borderWidth: 3,
+  },
+  cornerActive: {
+    borderColor: '#4CAF50',
+    borderWidth: 4,
   },
   topLeft: {
     top: 0,
@@ -337,5 +447,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  ocrStatusContainer: {
+    position: 'absolute',
+    top: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  ocrStatusBox: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  ocrStatusText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 10,
   },
 });
