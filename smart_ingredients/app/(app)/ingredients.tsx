@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   itemSubDate: { fontSize: 12, color: '#888' },
   itemQuantity: { fontSize: 16, fontWeight: 'bold', color: '#007AFF', paddingLeft: 10 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  emptyTitle: { fontSize: 22, fontWeight: 'bold', color: '#555', marginTop: 70 },
+  emptyTitle: { fontSize: 22, fontWeight: 'bold', color: '#555', marginTop: 15 },
   emptySubtitle: { fontSize: 16, color: '#888', textAlign: 'center', marginTop: 5 },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 3, paddingBottom: Platform.OS === 'ios' ? 30 : 20 },
