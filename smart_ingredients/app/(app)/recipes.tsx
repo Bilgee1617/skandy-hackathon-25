@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { getRecipeRecommendations, getMockRecipeRecommendations, Recipe, Ingredient, RecipeRecommendation } from '../../lib/recipeService';
+import { getRecipeRecommendations, Recipe, Ingredient, RecipeRecommendation } from '../../lib/recipeService';
+import { supabase } from '../../lib/supabase';
+import { User } from '@supabase/supabase-js';
 
 // Function to get recipe theme based on recipe name/type
 const getRecipeTheme = (recipeName: string) => {
@@ -101,60 +103,75 @@ export default function RecipesScreen() {
   const [recommendations, setRecommendations] = useState<RecipeRecommendation | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
-  // Mock ingredients data - in real app, this would come from your inventory
-  const mockIngredients: Ingredient[] = [
-    {
-      name: "bananas",
-      quantity: 3,
-      unit: "ea",
-      expiryDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
-    },
-    {
-      name: "bell peppers",
-      quantity: 2,
-      unit: "ea", 
-      expiryDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000), // 1 day from now
-    },
-    {
-      name: "milk",
-      quantity: 1,
-      unit: "gallon",
-      expiryDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-    },
-    {
-      name: "eggs",
-      quantity: 12,
-      unit: "ea",
-      expiryDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
-    },
-    {
-      name: "flour",
-      quantity: 2,
-      unit: "lb",
-      expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+  // Fetch user session
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUser(session.user);
+        fetchIngredients(session.user);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  // Fetch ingredients from database
+  const fetchIngredients = async (user: User) => {
+    try {
+      const { data, error } = await supabase
+        .from('ingredients')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('expiration_date', { ascending: true, nullsFirst: false });
+
+      if (error) {
+        console.error('Error fetching ingredients:', error);
+        Alert.alert('Error', 'Failed to load ingredients');
+        return;
+      }
+
+      // Convert database ingredients to recipe service format
+      const convertedIngredients: Ingredient[] = (data || []).map(item => ({
+        name: item.name,
+        quantity: item.quantity || 1,
+        unit: item.unit || 'ea',
+        expiryDate: item.expiration_date ? new Date(item.expiration_date) : undefined,
+      }));
+
+      setIngredients(convertedIngredients);
+    } catch (error) {
+      console.error('Error fetching ingredients:', error);
+      Alert.alert('Error', 'Failed to load ingredients');
     }
-  ];
+  };
 
   const loadRecipeRecommendations = async () => {
+    if (ingredients.length === 0) {
+      Alert.alert('No Ingredients', 'Please add some ingredients to your pantry first to get recipe recommendations.');
+      return;
+    }
+
     setLoading(true);
     try {
-      // Try GPT recommendations first, fallback to mock if API key not available
-      const result = await getRecipeRecommendations(mockIngredients);
+      const result = await getRecipeRecommendations(ingredients);
       setRecommendations(result);
     } catch (error) {
-      console.log('GPT recommendations failed, using mock data:', error);
-      // Fallback to mock recommendations
-      const mockResult = getMockRecipeRecommendations();
-      setRecommendations(mockResult);
+      console.error('Recipe recommendations failed:', error);
+      Alert.alert('Error', 'Failed to get recipe recommendations. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
     }
   };
 
+  // Load recommendations when ingredients are available
   useEffect(() => {
-    loadRecipeRecommendations();
-  }, []);
+    if (ingredients.length > 0) {
+      loadRecipeRecommendations();
+    }
+  }, [ingredients]);
 
   const renderRecipeCard = (recipe: Recipe) => {
     const theme = getRecipeTheme(recipe.name);
@@ -295,10 +312,17 @@ export default function RecipesScreen() {
             {recommendations.recipes.map(renderRecipeCard)}
           </View>
         </ScrollView>
+      ) : ingredients.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="basket-outline" size={64} color="#ccc" />
+          <Text style={styles.emptyText}>No ingredients in your pantry</Text>
+          <Text style={styles.emptySubtext}>Add some ingredients to get personalized recipe recommendations!</Text>
+        </View>
       ) : (
         <View style={styles.emptyContainer}>
           <Ionicons name="restaurant-outline" size={64} color="#ccc" />
           <Text style={styles.emptyText}>No recipe recommendations available</Text>
+          <Text style={styles.emptySubtext}>Try refreshing or check your internet connection</Text>
           <TouchableOpacity 
             style={styles.retryButton}
             onPress={loadRecipeRecommendations}
@@ -504,7 +528,15 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginTop: 16,
+    fontWeight: '500',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
     marginBottom: 24,
+    paddingHorizontal: 20,
   },
   retryButton: {
     backgroundColor: '#007AFF',

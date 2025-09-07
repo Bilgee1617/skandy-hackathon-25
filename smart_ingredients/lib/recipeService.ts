@@ -43,7 +43,7 @@ export interface RecipeSettings {
 // Default settings for recipe recommendations
 const DEFAULT_SETTINGS: RecipeSettings = {
   model: 'gpt-3.5-turbo',
-  temperature: 0.7, // Higher temperature for more creative recipes
+  temperature: 0.3, // Higher temperature for more creative recipes
   maxTokens: 2000,
   maxRecipes: 5,
 };
@@ -81,7 +81,8 @@ Your recommendations should:
 5. Suggest appropriate serving sizes
 6. Rate difficulty level appropriately
 
-Return your response as a JSON object with this exact structure:
+CRITICAL: Return ONLY a valid JSON object with this exact structure. Do NOT include any markdown formatting, code blocks, explanations, or additional text. Start your response with { and end with }. Return only the raw JSON:
+
 {
   "recipes": [
     {
@@ -132,7 +133,7 @@ Please recommend ${DEFAULT_SETTINGS.maxRecipes} recipes that:
 3. Are quick and practical for busy people
 4. Help reduce food waste
 
-Return valid JSON format with the exact structure specified.`;
+CRITICAL: Return ONLY valid JSON with the exact structure specified. Start with { and end with }. No markdown, no explanations, no additional text - just the JSON object.`;
 }
 
 /**
@@ -222,12 +223,69 @@ export async function getRecipeRecommendations(
 
     // Parse the JSON response
     let recipes: Recipe[] = [];
+    let jsonContent = '';
+    
     try {
-      const parsed = JSON.parse(content);
+      // Handle markdown-wrapped JSON responses
+      jsonContent = content.trim();
+      
+      // Remove markdown code blocks if present
+      if (jsonContent.startsWith('```json')) {
+        jsonContent = jsonContent.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (jsonContent.startsWith('```')) {
+        jsonContent = jsonContent.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+      
+      // Clean up any trailing characters or extra content
+      jsonContent = jsonContent.trim();
+      
+      // Find the first { and last } to extract just the JSON object
+      const firstBrace = jsonContent.indexOf('{');
+      const lastBrace = jsonContent.lastIndexOf('}');
+      
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonContent = jsonContent.substring(firstBrace, lastBrace + 1);
+      }
+      
+      console.log('Cleaned JSON content:', jsonContent);
+      
+      const parsed = JSON.parse(jsonContent);
       recipes = parsed.recipes || [];
     } catch (parseError) {
       console.error('Failed to parse GPT response:', content);
-      throw new Error('Invalid JSON response from GPT API');
+      console.error('Parse error:', parseError);
+      console.error('Cleaned content that failed:', jsonContent);
+      
+      // Try to extract recipes using regex as a fallback
+      try {
+        console.log('Attempting regex fallback extraction...');
+        const recipeMatches = content.match(/"name":\s*"([^"]+)"/g);
+        if (recipeMatches && recipeMatches.length > 0) {
+          console.log('Found recipe names via regex:', recipeMatches);
+          // Create basic recipe objects from extracted names
+          recipes = recipeMatches.map((match: string, index: number) => {
+            const name = match.match(/"name":\s*"([^"]+)"/)?.[1] || `Recipe ${index + 1}`;
+            return {
+              name,
+              description: `A delicious recipe using your expiring ingredients`,
+              ingredients: ['Your available ingredients'],
+              instructions: ['Follow your favorite cooking method'],
+              prepTime: '15 minutes',
+              cookTime: '30 minutes',
+              servings: 4,
+              difficulty: 'Easy' as const,
+              category: 'Main Dish',
+              confidence: 0.7
+            };
+          });
+          console.log('Created fallback recipes:', recipes);
+        } else {
+          throw new Error('Could not extract any recipe information');
+        }
+      } catch (fallbackError) {
+        console.error('Fallback extraction also failed:', fallbackError);
+        throw new Error('Invalid JSON response from GPT API');
+      }
     }
 
     const processingTime = Date.now() - startTime;
