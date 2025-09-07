@@ -1,8 +1,12 @@
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Modal } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
+import CameraScreen from '../components/CameraScreen';
 
 export default function ScanScreen() {
+  const [showCamera, setShowCamera] = useState(false);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
@@ -11,28 +15,39 @@ export default function ScanScreen() {
           <Ionicons name="scan" size={80} color="#007AFF" />
         </View>
         <Text style={styles.title}>Scan More</Text>
-        <Text style={styles.subtitle}>Scan barcodes to add ingredients to your inventory</Text>
+        <Text style={styles.subtitle}>Scan receipts to extract ingredients and add them to your inventory</Text>
         
-        <TouchableOpacity style={styles.scanButton}>
+        <TouchableOpacity 
+          style={styles.scanButton}
+          onPress={() => setShowCamera(true)}
+        >
           <Ionicons name="camera" size={24} color="white" />
           <Text style={styles.scanButtonText}>Start Scanning</Text>
         </TouchableOpacity>
         
         <View style={styles.features}>
           <View style={styles.feature}>
-            <Ionicons name="barcode" size={20} color="#007AFF" />
-            <Text style={styles.featureText}>Barcode Recognition</Text>
+            <Ionicons name="receipt" size={20} color="#007AFF" />
+            <Text style={styles.featureText}>Receipt OCR</Text>
           </View>
           <View style={styles.feature}>
             <Ionicons name="add-circle" size={20} color="#007AFF" />
             <Text style={styles.featureText}>Auto-add Ingredients</Text>
           </View>
           <View style={styles.feature}>
-            <Ionicons name="information-circle" size={20} color="#007AFF" />
-            <Text style={styles.featureText}>Product Information</Text>
+            <Ionicons name="text" size={20} color="#007AFF" />
+            <Text style={styles.featureText}>Text Recognition</Text>
           </View>
         </View>
       </View>
+      
+      <Modal
+        visible={showCamera}
+        animationType="slide"
+        presentationStyle="fullScreen"
+      >
+        <CameraScreen onClose={() => setShowCamera(false)} />
+      </Modal>
     </SafeAreaView>
   );
 }
