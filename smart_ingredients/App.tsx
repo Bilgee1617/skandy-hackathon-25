@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase';
 import Auth from './app/login';
 import { Session } from '@supabase/supabase-js';
 import { Slot } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -18,5 +19,10 @@ export default function App() {
     });
   }, []);
 
-  return <>{session && session.user ? <Slot /> : <Auth />}</>;
+  return (
+    <>
+      <StatusBar style="auto" />
+      {session && session.user ? <Slot /> : <Auth />}
+    </>
+  );
 }
