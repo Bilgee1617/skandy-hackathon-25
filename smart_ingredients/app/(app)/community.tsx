@@ -3,11 +3,12 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { 
     StyleSheet, View, Text, FlatList, Alert, 
-    SafeAreaView, ActivityIndicator, TouchableOpacity
+    SafeAreaView, ActivityIndicator, TouchableOpacity, Dimensions, ScrollView
 } from 'react-native';
 import { User } from '@supabase/supabase-js';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 
 interface Ingredient {
   id: string;
@@ -63,12 +64,89 @@ const formatDistance = (distance: number): string => {
   return `${distance.toFixed(1)}km`;
 };
 
+// Generate HTML for OpenStreetMap with Leaflet (free alternative)
+const generateMapHTML = (userLocation: Location.LocationObject, ingredients: Ingredient[]): string => {
+  const userLat = userLocation.coords.latitude;
+  const userLon = userLocation.coords.longitude;
+  
+  // Create markers for food items
+  const markers = ingredients
+    .filter(ing => ing.latitude && ing.longitude)
+    .map(ing => {
+      const { text, color } = getExpirationInfo(ing.expiration_date);
+      const owner = ing.profiles?.username || 'Unknown';
+      const markerColor = color === '#d9534f' ? 'red' : color === '#f0ad4e' ? 'orange' : 'green';
+      
+      return `
+        L.marker([${ing.latitude}, ${ing.longitude}], {
+          icon: L.divIcon({
+            className: 'custom-marker',
+            html: \`<div style="background-color: ${markerColor}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"><span style="color: white; font-size: 12px;">🍎</span></div>\`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+          })
+        }).addTo(map).bindPopup(\`
+          <div style="padding: 8px; min-width: 150px;">
+            <h4 style="margin: 0 0 5px 0; color: #333;">${ing.name}</h4>
+            <p style="margin: 0 0 3px 0; color: #666; font-size: 14px;">${ing.quantity} ${ing.unit}</p>
+            <p style="margin: 0 0 3px 0; color: #888; font-size: 12px;">From: ${owner}</p>
+            <p style="margin: 0 0 3px 0; color: ${color}; font-weight: bold; font-size: 12px;">${text}</p>
+            ${ing.distance !== undefined ? `<p style="margin: 0; color: #007AFF; font-size: 12px;">📍 ${formatDistance(ing.distance)} away</p>` : ''}
+          </div>
+        \`);`;
+    })
+    .join('\n');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <style>
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100%; }
+        .custom-marker { background: transparent !important; border: none !important; }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <script>
+        // Initialize the map
+        const map = L.map('map').setView([${userLat}, ${userLon}], 13);
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(map);
+        
+        // Add user location marker
+        L.marker([${userLat}, ${userLon}], {
+          icon: L.divIcon({
+            className: 'custom-marker',
+            html: '<div style="background-color: #007AFF; width: 28px; height: 28px; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.4);"><span style="color: white; font-size: 14px;">📍</span></div>',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+          })
+        }).addTo(map).bindPopup('<div style="padding: 8px;"><strong>Your Location</strong><br>You are here!</div>');
+        
+        // Add food item markers
+        ${markers}
+      </script>
+    </body>
+    </html>
+  `;
+};
+
 export default function CommunityScreen() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -78,6 +156,9 @@ export default function CommunityScreen() {
         }
     };
     fetchUser();
+    
+    // Fetch dummy data immediately for testing
+    fetchExpiringIngredients();
   }, []);
 
   useEffect(() => {
@@ -121,11 +202,25 @@ export default function CommunityScreen() {
     };
   }, [user]);
 
+  // Refetch data when user location changes
+  useEffect(() => {
+    if (user && userLocation) {
+      fetchExpiringIngredients();
+    }
+  }, [userLocation]);
+
   const fetchExpiringIngredients = async () => {
-    if (loading || !user) return;
+    if (loading) return;
+    console.log('Fetching expiring ingredients...', { user: !!user, userLocation: !!userLocation });
     setLoading(true);
 
     // Create dummy data with location information for testing
+    // Use a default location (San Francisco) if user location is not available yet
+    const defaultLat = 37.7749;
+    const defaultLon = -122.4194;
+    const currentLat = userLocation?.coords.latitude || defaultLat;
+    const currentLon = userLocation?.coords.longitude || defaultLon;
+
     const dummyIngredients: Ingredient[] = [
       {
         id: '1',
@@ -134,8 +229,8 @@ export default function CommunityScreen() {
         quantity: 5,
         unit: 'ea',
         user_id: 'user1',
-        latitude: userLocation ? userLocation.coords.latitude + 0.01 : 37.7749, // ~1km away
-        longitude: userLocation ? userLocation.coords.longitude + 0.01 : -122.4194,
+        latitude: currentLat + 0.01, // ~1km away
+        longitude: currentLon + 0.01,
         profiles: { username: 'Sarah' }
       },
       {
@@ -145,8 +240,8 @@ export default function CommunityScreen() {
         quantity: 1,
         unit: 'gallon',
         user_id: 'user2',
-        latitude: userLocation ? userLocation.coords.latitude - 0.005 : 37.7849, // ~500m away
-        longitude: userLocation ? userLocation.coords.longitude - 0.005 : -122.4094,
+        latitude: currentLat - 0.005, // ~500m away
+        longitude: currentLon - 0.005,
         profiles: { username: 'Mike' }
       },
       {
@@ -156,8 +251,8 @@ export default function CommunityScreen() {
         quantity: 3,
         unit: 'ea',
         user_id: 'user3',
-        latitude: userLocation ? userLocation.coords.latitude + 0.02 : 37.7849, // ~2km away
-        longitude: userLocation ? userLocation.coords.longitude - 0.01 : -122.4294,
+        latitude: currentLat + 0.02, // ~2km away
+        longitude: currentLon - 0.01,
         profiles: { username: 'Emma' }
       },
       {
@@ -167,8 +262,8 @@ export default function CommunityScreen() {
         quantity: 2,
         unit: 'pack',
         user_id: 'user4',
-        latitude: userLocation ? userLocation.coords.latitude - 0.015 : 37.7649, // ~1.5km away
-        longitude: userLocation ? userLocation.coords.longitude + 0.02 : -122.3994,
+        latitude: currentLat - 0.015, // ~1.5km away
+        longitude: currentLon + 0.02,
         profiles: { username: 'Alex' }
       },
       {
@@ -178,8 +273,8 @@ export default function CommunityScreen() {
         quantity: 1,
         unit: 'bunch',
         user_id: 'user5',
-        latitude: userLocation ? userLocation.coords.latitude + 0.03 : 37.7949, // ~3km away
-        longitude: userLocation ? userLocation.coords.longitude + 0.03 : -122.4494,
+        latitude: currentLat + 0.03, // ~3km away
+        longitude: currentLon + 0.03,
         profiles: { username: 'Lisa' }
       },
       {
@@ -189,8 +284,8 @@ export default function CommunityScreen() {
         quantity: 1,
         unit: 'loaf',
         user_id: 'user6',
-        latitude: userLocation ? userLocation.coords.latitude - 0.008 : 37.7649, // ~800m away
-        longitude: userLocation ? userLocation.coords.longitude - 0.008 : -122.4094,
+        latitude: currentLat - 0.008, // ~800m away
+        longitude: currentLon - 0.008,
         profiles: { username: 'David' }
       }
     ];
@@ -220,6 +315,7 @@ export default function CommunityScreen() {
         ? combinedData.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity))
         : combinedData.sort((a, b) => new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime());
 
+    console.log('Setting ingredients:', sortedData.length, 'items');
     setIngredients(sortedData);
     setLoading(false);
 
@@ -332,6 +428,38 @@ export default function CommunityScreen() {
     }
   };
 
+  const renderMapView = () => {
+    if (!userLocation) {
+      return (
+        <View style={styles.mapPlaceholder}>
+          <Ionicons name="location-outline" size={64} color="#ccc" />
+          <Text style={styles.mapPlaceholderText}>Location required to view map</Text>
+          <Text style={styles.mapPlaceholderSubtext}>Enable location permission to see food items on a map</Text>
+        </View>
+      );
+    }
+
+    const mapHTML = generateMapHTML(userLocation, ingredients);
+
+    return (
+      <View style={styles.mapContainer}>
+        <WebView
+          source={{ html: mapHTML }}
+          style={styles.map}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          startInLoadingState={true}
+          renderLoading={() => (
+            <View style={styles.mapLoading}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={styles.mapLoadingText}>Loading map...</Text>
+            </View>
+          )}
+        />
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
         <View style={styles.header}>
@@ -339,22 +467,51 @@ export default function CommunityScreen() {
             <Text style={styles.subtitle}>
               {locationPermission ? 'Food near you' : 'See what others are sharing!'}
             </Text>
-            {locationPermission && (
-              <TouchableOpacity style={styles.locationButton} onPress={refreshLocation}>
-                <Ionicons name="refresh" size={16} color="#007AFF" />
-                <Text style={styles.locationButtonText}>Refresh Location</Text>
-              </TouchableOpacity>
-            )}
+            
+            <View style={styles.headerControls}>
+              <View style={styles.viewToggle}>
+                <TouchableOpacity 
+                  style={[styles.toggleButton, viewMode === 'list' && styles.toggleButtonActive]}
+                  onPress={() => setViewMode('list')}
+                >
+                  <Ionicons name="list" size={20} color={viewMode === 'list' ? '#fff' : '#007AFF'} />
+                  <Text style={[styles.toggleButtonText, viewMode === 'list' && styles.toggleButtonTextActive]}>
+                    List
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.toggleButton, viewMode === 'map' && styles.toggleButtonActive]}
+                  onPress={() => setViewMode('map')}
+                >
+                  <Ionicons name="map" size={20} color={viewMode === 'map' ? '#fff' : '#007AFF'} />
+                  <Text style={[styles.toggleButtonText, viewMode === 'map' && styles.toggleButtonTextActive]}>
+                    Map
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              {locationPermission && (
+                <TouchableOpacity style={styles.locationButton} onPress={refreshLocation}>
+                  <Ionicons name="refresh" size={16} color="#007AFF" />
+                  <Text style={styles.locationButtonText}>Refresh</Text>
+                </TouchableOpacity>
+              )}
+            </View>
         </View>
         {loading && <ActivityIndicator />}
-        <FlatList
-            data={ingredients}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.list}
-            onRefresh={fetchExpiringIngredients}
-            refreshing={loading}
-        />
+        {console.log('Rendering with ingredients:', ingredients.length, 'items')}
+        {viewMode === 'list' ? (
+          <FlatList
+              data={ingredients}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.list}
+              onRefresh={fetchExpiringIngredients}
+              refreshing={loading}
+          />
+        ) : (
+          renderMapView()
+        )}
     </SafeAreaView>
   );
 }
@@ -440,5 +597,82 @@ const styles = StyleSheet.create({
       color: '#007AFF',
       marginLeft: 4,
       fontWeight: '500',
+  },
+  // Map View Styles
+  mapContainer: {
+      flex: 1,
+  },
+  map: {
+      flex: 1,
+      width: Dimensions.get('window').width,
+  },
+  mapLoading: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      zIndex: 1,
+  },
+  mapLoadingText: {
+      marginTop: 12,
+      fontSize: 16,
+      color: '#666',
+      fontWeight: '500',
+  },
+  mapPlaceholder: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: '#f5f5f5',
+      padding: 40,
+  },
+  mapPlaceholderText: {
+      fontSize: 16,
+      color: '#666',
+      marginTop: 16,
+      textAlign: 'center',
+      fontWeight: '500',
+  },
+  mapPlaceholderSubtext: {
+      fontSize: 14,
+      color: '#999',
+      marginTop: 8,
+      textAlign: 'center',
+  },
+  // Header Controls Styles
+  headerControls: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 15,
+  },
+  viewToggle: {
+      flexDirection: 'row',
+      backgroundColor: '#f0f0f0',
+      borderRadius: 20,
+      padding: 2,
+  },
+  toggleButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 18,
+  },
+  toggleButtonActive: {
+      backgroundColor: '#007AFF',
+  },
+  toggleButtonText: {
+      fontSize: 14,
+      color: '#007AFF',
+      marginLeft: 6,
+      fontWeight: '500',
+  },
+  toggleButtonTextActive: {
+      color: '#fff',
   },
 });
