@@ -194,7 +194,7 @@ export default function IngredientsScreen() {
   };
 
   const renderEmptyState = () => (
-    <View style={[styles.emptyContainer, { flex: 1, justifyContent: 'center', alignItems: 'center' }]}>
+    <View style={styles.emptyContainer}>
         <Ionicons name="basket-outline" size={80} color="#ccc" />
         <Text style={styles.emptyTitle}>Pantry's empty!</Text>
         <Text style={styles.emptySubtitle}>Time for a grocery run?</Text>
@@ -207,7 +207,7 @@ export default function IngredientsScreen() {
             <Text style={styles.title}>Your Pantry</Text>
             <Text style={styles.subtitle}>What's fresh and what's... not so fresh?</Text>
         </View>
-        <FlatList data={ingredients} renderItem={renderItem} keyExtractor={(item) => item.id} onRefresh={fetchIngredients} refreshing={loading} ListEmptyComponent={renderEmptyState} contentContainerStyle={styles.listContent} />
+        <FlatList data={ingredients} renderItem={renderItem} keyExtractor={(item) => item.id} onRefresh={fetchIngredients} refreshing={loading} ListEmptyComponent={renderEmptyState} contentContainerStyle={ingredients.length === 0 ? styles.flexOne : styles.listContent} />
 
         <View style={styles.addButtonContainer}>
             <TouchableOpacity style={styles.addButton} onPress={handleOpenAddModal}>
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   itemDate: { fontSize: 14 },
   itemSubDate: { fontSize: 12, color: '#888' },
   itemQuantity: { fontSize: 16, fontWeight: 'bold', color: '#007AFF', paddingLeft: 10 },
-  emptyContainer: { padding: 20 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   emptyTitle: { fontSize: 22, fontWeight: 'bold', color: '#555', marginTop: 70 },
   emptySubtitle: { fontSize: 16, color: '#888', textAlign: 'center', marginTop: 5 },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
