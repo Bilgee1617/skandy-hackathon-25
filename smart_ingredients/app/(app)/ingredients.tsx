@@ -17,6 +17,7 @@ interface Ingredient {
   unit: string;
 }
 
+// --- Helper Functions ---
 const getExpirationInfo = (expirationDate: string) => {
   if (!expirationDate) {
     return { text: 'No expiration date', color: '#666', days: Infinity };
@@ -39,19 +40,33 @@ const getExpirationInfo = (expirationDate: string) => {
   return { text: `Expires in ${diffDays} days`, color: '#2e7d32', days: diffDays };
 };
 
+const toISODateString = (date: Date) => date.toISOString().split('T')[0];
+
 export default function IngredientsScreen() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
+  
+  // Edit Modal State
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
-  const [newQuantity, setNewQuantity] = useState('');
-  const [newUnit, setNewUnit] = useState('');
+  const [editQuantity, setEditQuantity] = useState('');
+  const [editUnit, setEditUnit] = useState('');
+
+  // Add Modal State
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemQuantity, setNewItemQuantity] = useState('');
+  const [newItemUnit, setNewItemUnit] = useState('');
+  const [newItemExpDate, setNewItemExpDate] = useState('');
+  const [newItemBoughtOn, setNewItemBoughtOn] = useState('');
+
 
   useEffect(() => {
     fetchIngredients();
   }, []);
 
   const fetchIngredients = async () => {
+    if(loading) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('ingredients')
@@ -66,24 +81,22 @@ export default function IngredientsScreen() {
     setLoading(false);
   };
 
-  const handleOpenModal = (ingredient: Ingredient) => {
+  // --- Edit Handlers ---
+  const handleOpenEditModal = (ingredient: Ingredient) => {
     setSelectedIngredient(ingredient);
-    setNewQuantity(ingredient.quantity.toString());
-    setNewUnit(ingredient.unit || '');
-    setModalVisible(true);
+    setEditQuantity(ingredient.quantity.toString());
+    setEditUnit(ingredient.unit || '');
+    setEditModalVisible(true);
   };
 
-  const handleCloseModal = () => {
-    setModalVisible(false);
-    setSelectedIngredient(null);
-    setNewQuantity('');
-    setNewUnit('');
+  const handleCloseEditModal = () => {
+    setEditModalVisible(false);
   };
 
-  const handleSave = async () => {
+  const handleSaveEdit = async () => {
     if (!selectedIngredient) return;
 
-    const quantityValue = parseFloat(newQuantity);
+    const quantityValue = parseFloat(editQuantity);
     if (isNaN(quantityValue) || quantityValue < 0) {
         Alert.alert('Invalid Quantity', 'Please enter a valid, non-negative number.');
         return;
@@ -93,18 +106,10 @@ export default function IngredientsScreen() {
     let error;
 
     if (quantityValue <= 0) {
-        // If quantity is 0 or less, delete the ingredient
-        const { error: deleteError } = await supabase
-            .from('ingredients')
-            .delete()
-            .eq('id', selectedIngredient.id);
+        const { error: deleteError } = await supabase.from('ingredients').delete().eq('id', selectedIngredient.id);
         error = deleteError;
     } else {
-        // Otherwise, update the quantity and unit
-        const { error: updateError } = await supabase
-            .from('ingredients')
-            .update({ quantity: quantityValue, unit: newUnit })
-            .eq('id', selectedIngredient.id);
+        const { error: updateError } = await supabase.from('ingredients').update({ quantity: quantityValue, unit: editUnit }).eq('id', selectedIngredient.id);
         error = updateError;
     }
 
@@ -112,24 +117,64 @@ export default function IngredientsScreen() {
       Alert.alert('Error saving ingredient', error.message);
     } else {
         await fetchIngredients();
-        handleCloseModal();
+        handleCloseEditModal();
     }
     setLoading(false);
   };
 
+  // --- Add Handlers ---
+  const handleOpenAddModal = () => {
+      setNewItemName('');
+      setNewItemQuantity('1');
+      setNewItemUnit('');
+      setNewItemExpDate('');
+      setNewItemBoughtOn(toISODateString(new Date()));
+      setAddModalVisible(true);
+  };
+
+  const handleCloseAddModal = () => {
+      setAddModalVisible(false);
+  };
+
+  const handleAddItem = async () => {
+    if (!newItemName.trim()) {
+        Alert.alert('Missing Name', 'Please enter a name for the ingredient.');
+        return;
+    }
+    const quantityValue = parseFloat(newItemQuantity);
+    if (isNaN(quantityValue) || quantityValue <= 0) {
+        Alert.alert('Invalid Quantity', 'Please enter a valid, positive number for the quantity.');
+        return;
+    }
+
+    setLoading(true);
+    const { error } = await supabase.from('ingredients').insert([{
+        name: newItemName.trim(),
+        quantity: quantityValue,
+        unit: newItemUnit.trim(),
+        expiration_date: newItemExpDate || null,
+        bought_on: newItemBoughtOn || toISODateString(new Date()),
+    }]);
+
+    if (error) {
+        Alert.alert('Error adding ingredient', error.message);
+    } else {
+        await fetchIngredients();
+        handleCloseAddModal();
+    }
+    setLoading(false);
+  }
+
+  // --- Render Functions ---
   const renderItem = ({ item }: { item: Ingredient }) => {
     const expiration = getExpirationInfo(item.expiration_date);
     return (
-      <TouchableOpacity onPress={() => handleOpenModal(item)}>
+      <TouchableOpacity onPress={() => handleOpenEditModal(item)}>
           <View style={styles.itemContainer}>
             <View style={styles.itemDetails}>
               <Text style={styles.itemName}>{item.name}</Text>
-              <Text style={[styles.itemDate, { color: expiration.color, fontWeight: 'bold' }]}>
-                {expiration.text}
-              </Text>
-              <Text style={styles.itemSubDate}>
-                ({item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : 'N/A'})
-              </Text>
+              <Text style={[styles.itemDate, { color: expiration.color, fontWeight: 'bold' }]}>{expiration.text}</Text>
+              <Text style={styles.itemSubDate}>({item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : 'N/A'})</Text>
             </View>
             {item.quantity != null && item.unit && <Text style={styles.itemQuantity}>{`${item.quantity} ${item.unit}`}</Text>}
           </View>
@@ -162,213 +207,95 @@ export default function IngredientsScreen() {
         keyboardShouldPersistTaps="handled"
       />
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={handleCloseModal}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.flexOne}
-        >
+        <View style={styles.addButtonContainer}>
+            <TouchableOpacity style={styles.addButton} onPress={handleOpenAddModal}>
+                <Ionicons name="add" size={24} color="white" />
+                <Text style={styles.addButtonText}>Add Ingredient</Text>
+            </TouchableOpacity>
+        </View>
+
+      {/* --- Edit Quantity Modal --- */}
+      <Modal animationType="slide" transparent={true} visible={editModalVisible} onRequestClose={handleCloseEditModal}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOne}>
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
                     <Text style={styles.modalTitle}>{selectedIngredient?.name}</Text>
-
                     <View style={styles.inputRow}>
-                        <TextInput
-                            style={styles.quantityInput}
-                            onChangeText={setNewQuantity}
-                            value={newQuantity}
-                            keyboardType="numeric"
-                            placeholder="Quantity"
-                        />
-                        <TextInput
-                            style={styles.unitInput}
-                            onChangeText={setNewUnit}
-                            value={newUnit}
-                            placeholder="Unit"
-                            autoCapitalize="none"
-                        />
+                        <TextInput style={styles.quantityInput} onChangeText={setEditQuantity} value={editQuantity} keyboardType="numeric" placeholder="Quantity"/>
+                        <TextInput style={styles.unitInput} onChangeText={setEditUnit} value={editUnit} placeholder="Unit" autoCapitalize="none"/>
                     </View>
-
                     <View style={styles.quickActionsContainer}>
-                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setNewQuantity(q => String(Math.max(0, parseFloat(q || '0') - 1)))}><Text style={styles.quickActionButtonText}>-1</Text></TouchableOpacity>
-                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setNewQuantity('0' )}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
-                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setNewQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(Math.max(0, parseFloat(q || '0') - 1)))}><Text style={styles.quickActionButtonText}>-1</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity('0' )}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
                     </View>
-
-                    <TouchableOpacity style={styles.button} onPress={handleSave} disabled={loading}>
-                        <Text style={styles.buttonText}>Save</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseModal}>
-                        <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
-                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={loading}><Text style={styles.buttonText}>Save</Text></TouchableOpacity>
+                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseEditModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
                 </View>
             </View>
           </TouchableWithoutFeedback>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* --- Add Ingredient Modal --- */}
+      <Modal animationType="slide" transparent={true} visible={addModalVisible} onRequestClose={handleCloseAddModal}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOne}>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>Add New Ingredient</Text>
+                    <TextInput style={styles.modalInput} placeholder="Ingredient Name (e.g., Milk)" value={newItemName} onChangeText={setNewItemName} />
+                    <View style={styles.inputRow}>
+                        <TextInput style={styles.quantityInput} placeholder="Quantity" value={newItemQuantity} onChangeText={setNewItemQuantity} keyboardType="numeric"/>
+                        <TextInput style={styles.unitInput} placeholder="Unit (e.g., L, g, pcs)" value={newItemUnit} onChangeText={setNewItemUnit} autoCapitalize="none"/>
+                    </View>
+                    <TextInput style={styles.modalInput} placeholder="Expiration Date (YYYY-MM-DD)" value={newItemExpDate} onChangeText={setNewItemExpDate} />
+                    <TextInput style={styles.modalInput} placeholder="Bought On (YYYY-MM-DD)" value={newItemBoughtOn} onChangeText={setNewItemBoughtOn} />
+                    
+                    <TouchableOpacity style={styles.button} onPress={handleAddItem} disabled={loading}><Text style={styles.buttonText}>Add to Pantry</Text></TouchableOpacity>
+                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseAddModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
+                </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  flexOne: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
-    padding: 20,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 5,
-  },
-  listContent: {
-    paddingHorizontal: 20,
-  },
-  itemContainer: {
-    backgroundColor: '#f9f9f9',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  itemDetails: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 18,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  itemDate: {
-    fontSize: 14,
-  },
-  itemSubDate: {
-    fontSize: 12,
-    color: '#888',
-  },
-  itemQuantity: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    paddingLeft: 10,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#555',
-    marginTop: 15,
-  },
-  emptySubtitle: {
-    fontSize: 16,
-    color: '#888',
-    textAlign: 'center',
-    marginTop: 5,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    paddingBottom: 30,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    marginBottom: 15,
-  },
-  quantityInput: {
-    flex: 2,
-    backgroundColor: '#f2f2f2',
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    height: 50,
-    fontSize: 18,
-  },
-  unitInput: {
-    flex: 1,
-    backgroundColor: '#f2f2f2',
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    height: 50,
-    fontSize: 18,
-    marginLeft: 10,
-  },
-  quickActionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-  },
-  quickActionButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: '#f2f2f2',
-    borderRadius: 10,
-  },
-  quickActionButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    width: '100%',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  cancelButtonText: {
-    color: '#007AFF',
-  },
+  flexOne: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#fff' },
+  header: { padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#333' },
+  subtitle: { fontSize: 16, color: '#666', marginTop: 5 },
+  listContent: { paddingHorizontal: 20 },
+  itemContainer: { backgroundColor: '#f9f9f9', padding: 15, borderRadius: 10, marginVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  itemDetails: { flex: 1 },
+  itemName: { fontSize: 18, fontWeight: '500', marginBottom: 4 },
+  itemDate: { fontSize: 14 },
+  itemSubDate: { fontSize: 12, color: '#888' },
+  itemQuantity: { fontSize: 16, fontWeight: 'bold', color: '#007AFF', paddingLeft: 10 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  emptyTitle: { fontSize: 22, fontWeight: 'bold', color: '#555', marginTop: 15 },
+  emptySubtitle: { fontSize: 16, color: '#888', textAlign: 'center', marginTop: 5 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalContent: { backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 3, paddingBottom: 30 },
+  modalTitle: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  modalInput: { backgroundColor: '#f2f2f2', borderRadius: 10, padding: 15, fontSize: 16, marginBottom: 10 },
+  inputRow: { flexDirection: 'row', marginBottom: 10 },
+  quantityInput: { flex: 2, backgroundColor: '#f2f2f2', borderRadius: 10, padding: 15, fontSize: 16 },
+  unitInput: { flex: 1, backgroundColor: '#f2f2f2', borderRadius: 10, padding: 15, fontSize: 16, marginLeft: 10 },
+  quickActionsContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
+  quickActionButton: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#f2f2f2', borderRadius: 10 },
+  quickActionButtonText: { fontSize: 16, color: '#007AFF', fontWeight: '600' },
+  button: { backgroundColor: '#007AFF', width: '100%', padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 10 },
+  buttonText: { color: 'white', fontSize: 18, fontWeight: '600' },
+  cancelButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#007AFF' },
+  cancelButtonText: { color: '#007AFF' },
+  addButtonContainer: { padding: 20, borderTopWidth: 1, borderTopColor: '#eee', backgroundColor: '#fff' },
+  addButton: { backgroundColor: '#007AFF', paddingVertical: 15, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  addButtonText: { color: 'white', fontSize: 18, fontWeight: '600', marginLeft: 8 },
 });
