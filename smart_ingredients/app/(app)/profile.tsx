@@ -74,6 +74,16 @@ export default function ProfileScreen() {
         }
     };
 
+    const handleSignOut = async () => {
+        setLoading(true);
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+            Alert.alert('Error signing out', error.message);
+        }
+        // The root layout will handle redirecting the user to the login screen.
+        setLoading(false);
+    };
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
@@ -94,6 +104,9 @@ export default function ProfileScreen() {
 
                 <TouchableOpacity style={styles.button} onPress={updateProfile} disabled={loading}>
                     <Text style={styles.buttonText}>{loading ? 'Saving...' : 'Save Changes'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.button, styles.signOutButton]} onPress={handleSignOut} disabled={loading}>
+                    <Text style={[styles.buttonText, styles.signOutButtonText]}>Log Out</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -150,5 +163,13 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 18,
         fontWeight: '600',
+    },
+    signOutButton: {
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#007AFF',
+    },
+    signOutButtonText: {
+        color: '#007AFF',
     },
 });

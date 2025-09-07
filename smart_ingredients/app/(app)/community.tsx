@@ -139,75 +139,73 @@ export default function CommunityScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Community Ingredients</Text>
+        <View style={styles.header}>
+            <Text style={styles.title}>Community</Text>
+            <Text style={styles.subtitle}>See what others are sharing!</Text>
+        </View>
         {loading && <ActivityIndicator />}
-      </View>
-      <FlatList
-        data={ingredients}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        onRefresh={fetchExpiringIngredients}
-        refreshing={loading}
-      />
+        <FlatList
+            data={ingredients}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+            onRefresh={fetchExpiringIngredients}
+            refreshing={loading}
+        />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f8f8f8',
-    },
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
-    title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-    },
-    list: {
-        padding: 10,
-    },
-    itemContainer: {
-        backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 10,
-        marginBottom: 10,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 1.41,
-        elevation: 2,
-    },
-    itemInfo: {
-        flex: 1,
-    },
-    itemName: {
-        fontSize: 18,
-        fontWeight: '500',
-    },
-    itemQuantity: {
-        fontSize: 14,
-        color: '#666',
-        marginTop: 5,
-    },
-    itemExpiration: {
-        fontSize: 14,
-        fontWeight: 'bold',
-    },
-    itemOwner: {
-        fontSize: 12,
-        color: '#888',
-        marginTop: 5,
-    },
+  container: { flex: 1, backgroundColor: '#fff' },
+  header: { 
+      padding: 20, 
+      alignItems: 'center', 
+      borderBottomWidth: 1, 
+      borderBottomColor: '#eee' 
+  },
+  title: { 
+      fontSize: 28, 
+      fontWeight: 'bold', 
+      color: '#333' 
+  },
+  subtitle: { 
+      fontSize: 16, 
+      color: '#666', 
+      marginTop: 5 
+  },
+  list: {
+      padding: 10,
+  },
+  itemContainer: { 
+      backgroundColor: '#f9f9f9', 
+      padding: 15, 
+      borderRadius: 10, 
+      marginVertical: 8, 
+      flexDirection: 'row', 
+      justifyContent: 'space-between', 
+      alignItems: 'center' 
+  },
+  itemInfo: {
+      flex: 1,
+  },
+  itemName: { 
+      fontSize: 18, 
+      fontWeight: '500', 
+      marginBottom: 4 
+  },
+  itemQuantity: {
+      fontSize: 14,
+      color: '#666',
+      marginTop: 5,
+  },
+  itemOwner: {
+      fontSize: 12,
+      color: '#888',
+      marginTop: 5,
+  },
+  itemExpiration: {
+      fontSize: 14,
+      fontWeight: 'bold',
+  },
 });
