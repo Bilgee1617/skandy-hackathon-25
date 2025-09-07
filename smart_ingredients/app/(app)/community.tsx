@@ -5,7 +5,7 @@ import {
     StyleSheet, View, Text, FlatList, Alert, 
     SafeAreaView, ActivityIndicator
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { User } from '@supabase/supabase-js';
 
 interface Ingredient {
   id: string;
@@ -13,6 +13,9 @@ interface Ingredient {
   expiration_date: string;
   quantity: number;
   unit: string;
+  profiles: {
+    username: string;
+  } | null;
 }
 
 // --- Helper Functions ---
@@ -36,8 +39,21 @@ const getExpirationInfo = (expirationDate: string) => {
 export default function CommunityScreen() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
+    const fetchUser = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            setUser(session.user);
+        }
+    };
+    fetchUser();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
     fetchExpiringIngredients();
     const subscription = supabase
       .channel('public:ingredients')
@@ -49,34 +65,41 @@ export default function CommunityScreen() {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, []);
+  }, [user]);
 
   const fetchExpiringIngredients = async () => {
-    if(loading) return;
+    if(loading || !user) return;
     setLoading(true);
 
     const today = new Date();
-    const twoDaysFromNow = new Date(today.setDate(today.getDate() + 2));
+    const twoDaysFromNow = new Date(new Date().setDate(today.getDate() + 2));
     const isoDate = twoDaysFromNow.toISOString();
 
     const { data, error } = await supabase
       .from('ingredients')
-      .select('*')
+      .select('*, profiles(username)')
       .lte('expiration_date', isoDate)
+      .neq('user_id', user.id)
       .order('expiration_date', { ascending: true, nullsFirst: false });
 
-    if (error) Alert.alert('Error fetching ingredients', error.message);
-    else setIngredients(data as Ingredient[]);
+    if (error) {
+        Alert.alert('Error fetching ingredients', error.message);
+    } else {
+        setIngredients(data as any[]);
+    }
     setLoading(false);
   };
 
   const renderItem = ({ item }: { item: Ingredient }) => {
     const { text, color } = getExpirationInfo(item.expiration_date);
+    const owner = item.profiles?.username || 'Unknown';
+
     return (
       <View style={styles.itemContainer}>
         <View style={styles.itemInfo}>
           <Text style={styles.itemName}>{item.name}</Text>
           <Text style={styles.itemQuantity}>{item.quantity} {item.unit}</Text>
+          <Text style={styles.itemOwner}>From: {owner}</Text>
         </View>
         <Text style={[styles.itemExpiration, { color }]}>{text}</Text>
       </View>
@@ -150,5 +173,10 @@ const styles = StyleSheet.create({
     itemExpiration: {
         fontSize: 14,
         fontWeight: 'bold',
+    },
+    itemOwner: {
+        fontSize: 12,
+        color: '#888',
+        marginTop: 5,
     },
 });
