@@ -3,10 +3,16 @@ import { createWorker } from 'tesseract.js';
 import { getOCRConfig, isGoogleVisionConfigured, GOOGLE_VISION_CONFIG } from './ocrConfig';
 import { analyzeReceiptText, ReceiptAnalysis } from './smartIngredientDetector';
 
+export interface DetectedIngredient {
+  name: string;
+  confidence: number;
+}
+
 export interface OCRResult {
   text: string;
   confidence: number;
   ingredients: string[];
+  detectedIngredients?: DetectedIngredient[];
   smartAnalysis?: ReceiptAnalysis;
 }
 
@@ -331,10 +337,17 @@ export async function extractTextFromReceipt(imageUri: string): Promise<OCRResul
     const ingredients = smartAnalysis.ingredients.map(ing => ing.name);
     console.log('Found ingredients:', ingredients);
     
+    // Create detected ingredients with confidence scores
+    const detectedIngredients: DetectedIngredient[] = smartAnalysis.ingredients.map(ing => ({
+      name: ing.name,
+      confidence: ing.confidence,
+    }));
+    
     return {
       text: extractedText,
       confidence: Math.max(confidence, smartAnalysis.confidence),
       ingredients: ingredients,
+      detectedIngredients: detectedIngredients,
       smartAnalysis: smartAnalysis,
     };
   } catch (error) {

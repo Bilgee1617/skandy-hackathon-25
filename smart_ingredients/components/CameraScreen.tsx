@@ -3,8 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, SafeAreaView, Activity
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { extractTextFromReceipt, extractTextFromReceiptMock, OCRResult } from '../lib/ocrService';
+import { extractTextFromReceipt, extractTextFromReceiptMock, OCRResult, DetectedIngredient } from '../lib/ocrService';
 import { getOCRConfig, getOCRMethodName } from '../lib/ocrConfig';
+import IngredientConfirmationModal, { IngredientItem } from './IngredientConfirmationModal';
 
 interface CameraScreenProps {
   onClose: () => void;
@@ -16,6 +17,8 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
   const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
   const [isScanning, setIsScanning] = useState(false);
   const [ocrStatus, setOcrStatus] = useState<string>('');
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [detectedIngredients, setDetectedIngredients] = useState<DetectedIngredient[]>([]);
   const cameraRef = useRef<CameraView>(null);
 
   useEffect(() => {
@@ -88,83 +91,13 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
       setOcrStatus('Complete!');
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Show results with smart analysis
+      // Show confirmation modal with detected ingredients
       if (allIngredients.length > 0) {
-        const ingredientsList = allIngredients.join('\n• ');
-        const smartAnalysis = ocrResult.smartAnalysis;
-        
-        let message = `Found ${allIngredients.length} food ingredients:\n\n• ${ingredientsList}`;
-        
-        if (smartAnalysis) {
-          message += `\n\n📊 Analysis Details:`;
-          message += `\n• Confidence: ${Math.round(smartAnalysis.confidence * 100)}%`;
-          message += `\n• Store: ${smartAnalysis.storeInfo.length > 0 ? smartAnalysis.storeInfo[0] : 'Unknown'}`;
-          message += `\n• Total: ${smartAnalysis.totalAmount || 'Not found'}`;
-          message += `\n• Prices found: ${smartAnalysis.prices.length}`;
-        }
-        
-        Alert.alert(
-          '🍎 Smart Ingredient Detection',
-          message,
-          [
-            {
-              text: 'Add to Inventory',
-              onPress: () => {
-                // TODO: Add ingredients to Supabase database
-                console.log('Adding ingredients to inventory:', allIngredients);
-                onClose();
-              },
-            },
-            {
-              text: 'View Analysis',
-              onPress: () => {
-                if (smartAnalysis) {
-                  const analysisDetails = `Smart Analysis Results:\n\n` +
-                    `Food Ingredients (${smartAnalysis.ingredients.length}):\n` +
-                    smartAnalysis.ingredients.map(ing => `• ${ing.name} (${ing.category}, ${Math.round(ing.confidence * 100)}%)`).join('\n') +
-                    `\n\nStore Info: ${smartAnalysis.storeInfo.join(', ')}\n` +
-                    `Prices: ${smartAnalysis.prices.join(', ')}\n` +
-                    `Total: ${smartAnalysis.totalAmount || 'Not found'}`;
-                  
-                  Alert.alert('Detailed Analysis', analysisDetails, [
-                    { text: 'OK' },
-                    {
-                      text: 'Add Ingredients',
-                      onPress: () => {
-                        console.log('Adding ingredients to inventory:', allIngredients);
-                        onClose();
-                      },
-                    },
-                  ]);
-                }
-              },
-            },
-            {
-              text: 'View Raw Text',
-              onPress: () => {
-                Alert.alert(
-                  'Raw OCR Text',
-                  ocrResult.text,
-                  [
-                    { text: 'OK' },
-                    {
-                      text: 'Add Ingredients',
-                      onPress: () => {
-                        console.log('Adding ingredients to inventory:', allIngredients);
-                        onClose();
-                      },
-                    },
-                  ]
-                );
-              },
-            },
-            {
-              text: 'Cancel',
-              style: 'cancel',
-              onPress: () => onClose(),
-            },
-          ]
-        );
+        // Use detectedIngredients if available, otherwise create from ingredients list
+        const ingredientsToShow = ocrResult.detectedIngredients || 
+          allIngredients.map(name => ({ name, confidence: 0.8 }));
+        setDetectedIngredients(ingredientsToShow);
+        setShowConfirmationModal(true);
       } else {
         Alert.alert(
           'No Ingredients Found',
@@ -223,6 +156,17 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
 
   const flipCamera = () => {
     setCameraType(cameraType === 'back' ? 'front' : 'back');
+  };
+
+  const handleSaveIngredients = (ingredients: IngredientItem[]) => {
+    console.log('Saving ingredients to inventory:', ingredients);
+    // TODO: Add ingredients to Supabase database
+    setShowConfirmationModal(false);
+    onClose();
+  };
+
+  const handleCancelConfirmation = () => {
+    setShowConfirmationModal(false);
   };
 
   if (!permission) {
@@ -325,6 +269,14 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
           </View>
         </View>
       </CameraView>
+
+      {/* Ingredient Confirmation Modal */}
+      <IngredientConfirmationModal
+        visible={showConfirmationModal}
+        detectedIngredients={detectedIngredients}
+        onSave={handleSaveIngredients}
+        onCancel={handleCancelConfirmation}
+      />
     </SafeAreaView>
   );
 }
