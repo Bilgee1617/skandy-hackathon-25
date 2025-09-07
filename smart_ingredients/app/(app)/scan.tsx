@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Modal } from 'r
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import CameraScreen from '../components/CameraScreen';
+import CameraScreen from '../../components/CameraScreen';
 
 export default function ScanScreen() {
   const [showCamera, setShowCamera] = useState(false);
