@@ -1,59 +1,52 @@
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 
-export default function TabLayout() {
+import { Stack, useRouter, useSegments } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import { Session } from '@supabase/supabase-js';
+
+const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const router = useRouter();
+  const segments = useSegments();
+  const [session, setSession] = useState<Session | null>(null);
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session);
+      setInitialized(true);
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!initialized) return;
+
+    const inAuthGroup = segments[0] === '(app)';
+
+    if (session && !inAuthGroup) {
+      router.replace('/(app)');
+    } else if (!session && inAuthGroup) {
+      router.replace('/login');
+    }
+  }, [initialized, session, segments, router]);
+
+  return <>{children}</>;
+};
+
+export default function RootLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: '#007AFF',
-        headerShown: false,
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={24} color={color} />
-          ),
+    <AuthProvider>
+      <Stack
+        screenOptions={{
+          headerShown: false,
         }}
-      />
-      <Tabs.Screen
-        name="ingredients"
-        options={{
-          title: 'Ingredients',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'leaf' : 'leaf-outline'} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="recipes"
-        options={{
-          title: 'Recipes',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'restaurant' : 'restaurant-outline'} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="scan"
-        options={{
-          title: 'Scan More',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'scan' : 'scan-outline'} size={24} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={24} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+      >
+        <Stack.Screen name="login" />
+        <Stack.Screen name="(app)" options={{ headerShown: false }} />
+      </Stack>
+    </AuthProvider>
   );
 }
