@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../../lib/supabase';
 import { Session } from '@supabase/supabase-js';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function ProfileScreen() {
   const [session, setSession] = useState<Session | null>(null);
@@ -40,20 +41,29 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
-      <View style={styles.content}>
         <View style={styles.header}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{session ? getInitials(session.user.email!) : ''}</Text>
-          </View>
-          <Text style={styles.email}>{session ? session.user.email : ''}</Text>
+            <Text style={styles.title}>Profile</Text>
+            <Text style={styles.subtitle}>Manage your account and preferences</Text>
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={() => Alert.alert('Feedback', 'Send us your feedback!')}>
-          <Text style={styles.buttonText}>Leave feedback</Text>
+      <View style={styles.content}>
+        {session && (
+            <View style={styles.userInfoSection}>
+                <View style={styles.avatar}>
+                    <Text style={styles.avatarText}>{getInitials(session.user.email!)}</Text>
+                </View>
+                <Text style={styles.email}>{session.user.email}</Text>
+            </View>
+        )}
+
+        <TouchableOpacity style={styles.button} onPress={() => Alert.alert('Feedback', 'This feature is coming soon!')}>
+            <Ionicons name="chatbubble-ellipses-outline" size={22} color="#007AFF" />
+            <Text style={styles.buttonText}>Leave Feedback</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.button, styles.logoutButton]} onPress={handleLogout}>
-          <Text style={[styles.buttonText, styles.logoutButtonText]}>Log out</Text>
+            <Ionicons name="log-out-outline" size={22} color="#FF3B30" />
+            <Text style={[styles.buttonText, styles.logoutButtonText]}>Log Out</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -63,29 +73,45 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F7',
+    backgroundColor: '#fff',
+  },
+  header: {
+    padding: 20,
+    paddingTop: 30, 
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 5,
   },
   content: {
     flex: 1,
     padding: 20,
   },
-  header: {
-    flexDirection: 'row',
+  userInfoSection: {
     alignItems: 'center',
     marginBottom: 40,
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginBottom: 15,
   },
   avatarText: {
     color: '#fff',
-    fontSize: 24,
+    fontSize: 32,
     fontWeight: 'bold',
   },
   email: {
@@ -94,26 +120,27 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   button: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f9f9f9',
     padding: 15,
     borderRadius: 10,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#eee',
   },
   buttonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: '#007AFF',
+    marginLeft: 10,
   },
   logoutButton: {
-    backgroundColor: '#FF3B30',
+    backgroundColor: '#fff',
+    borderColor: '#FF3B30',
   },
   logoutButtonText: {
-    color: '#fff',
+    color: '#FF3B30',
   },
 });
