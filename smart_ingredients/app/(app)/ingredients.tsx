@@ -28,15 +28,9 @@ const getExpirationInfo = (expirationDate: string) => {
   const diffTime = expDate.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0) {
-    return { text: `Expired ${Math.abs(diffDays)} days ago`, color: '#d32f2f', days: diffDays };
-  }
-  if (diffDays === 0) {
-    return { text: 'Expires today', color: '#d32f2f', days: diffDays };
-  }
-  if (diffDays <= 7) {
-    return { text: `Expires in ${diffDays} days`, color: '#ed6c02', days: diffDays };
-  }
+  if (diffDays < 0) return { text: `Expired ${Math.abs(diffDays)} days ago`, color: '#d32f2f', days: diffDays };
+  if (diffDays === 0) return { text: 'Expires today', color: '#d32f2f', days: diffDays };
+  if (diffDays <= 7) return { text: `Expires in ${diffDays} days`, color: '#ed6c02', days: diffDays };
   return { text: `Expires in ${diffDays} days`, color: '#2e7d32', days: diffDays };
 };
 
@@ -44,12 +38,11 @@ const toISODateString = (date: Date) => date.toISOString().split('T')[0];
 
 const formatDisplayDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    const userTimezoneOffset = date.getTimezoneOffset() * 60000;
-    const correctedDate = new Date(date.getTime() + userTimezoneOffset);
-    const month = String(correctedDate.getMonth() + 1).padStart(2, '0');
-    const day = String(correctedDate.getDate()).padStart(2, '0');
-    const year = correctedDate.getFullYear();
+    const parts = dateString.split('-').map(part => parseInt(part, 10));
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
     return `${month}-${day}-${year}`;
 };
 
@@ -182,7 +175,7 @@ export default function IngredientsScreen() {
             <Text style={styles.title}>Your Pantry</Text>
             <Text style={styles.subtitle}>What's fresh and what's... not so fresh?</Text>
         </View>
-        <FlatList data={ingredients} renderItem={renderItem} keyExtractor={(item) => item.id} onRefresh={fetchIngredients} refreshing={loading} ListEmptyComponent={renderEmptyState} contentContainerStyle={ingredients.length === 0 ? styles.flexOne : styles.listContent} />
+        <FlatList data={ingredients} renderItem={renderItem} keyExtractor={(item) => item.id} onRefresh={fetchIngredients} refreshing={loading} ListEmptyComponent={renderEmptyState} contentContainerStyle={styles.listContent} />
 
         <View style={styles.addButtonContainer}>
             <TouchableOpacity style={styles.addButton} onPress={handleOpenAddModal}>
@@ -192,49 +185,53 @@ export default function IngredientsScreen() {
         </View>
 
       {/* --- Edit Quantity Modal --- */}
-      <Modal animationType="slide" transparent={true} visible={editModalVisible} onRequestClose={handleCloseEditModal}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={handleCloseEditModal}>
-            <TouchableWithoutFeedback>
-                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOneJustifyEnd}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>{selectedIngredient?.name}</Text>
-                        <View style={styles.inputRow}>
-                            <TextInput style={[styles.modalInput, styles.quantityInput]} onChangeText={setEditQuantity} value={editQuantity} keyboardType="numeric" placeholder="Quantity"/>
-                            <TextInput style={[styles.modalInput, styles.unitInput]} onChangeText={setEditUnit} value={editUnit} placeholder="Unit" autoCapitalize="none"/>
-                        </View>
-                        <View style={styles.quickActionsContainer}>
-                            <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(Math.max(0, parseFloat(q || '0') - 1)))}><Text style={styles.quickActionButtonText}>-1</Text></TouchableOpacity>
-                            <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity('0' )}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
-                            <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
-                        </View>
-                        <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={loading}><Text style={styles.buttonText}>Save</Text></TouchableOpacity>
-                        <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseEditModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
+        <Modal animationType="slide" transparent={true} visible={editModalVisible} onRequestClose={handleCloseEditModal}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOne}>
+                <TouchableWithoutFeedback onPress={handleCloseEditModal}>
+                    <View style={styles.modalOverlay}>
+                        <TouchableWithoutFeedback>
+                            <View style={styles.modalContent}>
+                                <Text style={styles.modalTitle}>{selectedIngredient?.name}</Text>
+                                <View style={styles.inputRow}>
+                                    <TextInput style={[styles.modalInput, styles.quantityInput]} onChangeText={setEditQuantity} value={editQuantity} keyboardType="numeric" placeholder="Quantity" placeholderTextColor="#888"/>
+                                    <TextInput style={[styles.modalInput, styles.unitInput]} onChangeText={setEditUnit} value={editUnit} placeholder="Unit" autoCapitalize="none" placeholderTextColor="#888"/>
+                                </View>
+                                <View style={styles.quickActionsContainer}>
+                                    <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(Math.max(0, parseFloat(q || '0') - 1)))}><Text style={styles.quickActionButtonText}>-1</Text></TouchableOpacity>
+                                    <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity('0' )}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
+                                    <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
+                                </View>
+                                <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={loading}><Text style={styles.buttonText}>Save</Text></TouchableOpacity>
+                                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseEditModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
+                            </View>
+                        </TouchableWithoutFeedback>
                     </View>
-                </KeyboardAvoidingView>
-            </TouchableWithoutFeedback>
-        </TouchableOpacity>
+                </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
       </Modal>
 
       {/* --- Add Ingredient Modal --- */}
       <Modal animationType="slide" transparent={true} visible={addModalVisible} onRequestClose={handleCloseAddModal}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={handleCloseAddModal}>
-            <TouchableWithoutFeedback>
-                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOneJustifyEnd}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Add New Ingredient</Text>
-                        <TextInput style={styles.modalInput} placeholder="Ingredient Name (e.g., Milk)" value={newItemName} onChangeText={setNewItemName} />
-                        <View style={styles.inputRow}>
-                            <TextInput style={[styles.modalInput, {flex: 2, marginRight: 10}]} placeholder="Quantity" value={newItemQuantity} onChangeText={setNewItemQuantity} keyboardType="numeric"/>
-                            <TextInput style={[styles.modalInput, {flex: 1}]} placeholder="Unit (e.g., L, g)" value={newItemUnit} onChangeText={setNewItemUnit} autoCapitalize="none"/>
-                        </View>
-                        <TextInput style={styles.modalInput} placeholder="Expiration Date (MM-DD-YYYY)" value={newItemExpDate} onChangeText={setNewItemExpDate} />
-                        <TextInput style={styles.modalInput} placeholder="Bought On Date (MM-DD-YYYY)" value={newItemBoughtOn} onChangeText={setNewItemBoughtOn} />
-                        <TouchableOpacity style={styles.button} onPress={handleAddItem} disabled={loading}><Text style={styles.buttonText}>Add to Pantry</Text></TouchableOpacity>
-                        <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseAddModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOne}>
+                <TouchableWithoutFeedback onPress={handleCloseAddModal}>
+                    <View style={styles.modalOverlay}>
+                        <TouchableWithoutFeedback>
+                            <View style={styles.modalContent}>
+                                <Text style={styles.modalTitle}>Add New Ingredient</Text>
+                                <TextInput style={styles.modalInput} placeholder="Ingredient Name (e.g., Milk)" placeholderTextColor="#888" value={newItemName} onChangeText={setNewItemName} />
+                                <View style={styles.inputRow}>
+                                    <TextInput style={[styles.modalInput, {flex: 2, marginRight: 10}]} placeholder="Quantity" placeholderTextColor="#888" value={newItemQuantity} onChangeText={setNewItemQuantity} keyboardType="numeric"/>
+                                    <TextInput style={[styles.modalInput, {flex: 1}]} placeholder="Unit (e.g., L, g)" placeholderTextColor="#888" value={newItemUnit} onChangeText={setNewItemUnit} autoCapitalize="none"/>
+                                </View>
+                                <TextInput style={styles.modalInput} placeholder="Expiration Date (MM-DD-YYYY)" placeholderTextColor="#888" value={newItemExpDate} onChangeText={setNewItemExpDate} />
+                                <TextInput style={styles.modalInput} placeholder="Bought On Date (MM-DD-YYYY)" placeholderTextColor="#888" value={newItemBoughtOn} onChangeText={setNewItemBoughtOn} />
+                                <TouchableOpacity style={styles.button} onPress={handleAddItem} disabled={loading}><Text style={styles.buttonText}>Add to Pantry</Text></TouchableOpacity>
+                                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseAddModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
+                            </View>
+                        </TouchableWithoutFeedback>
                     </View>
-                </KeyboardAvoidingView>
-            </TouchableWithoutFeedback>
-        </TouchableOpacity>
+                </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
       </Modal>
 
     </SafeAreaView>
@@ -243,12 +240,11 @@ export default function IngredientsScreen() {
 
 const styles = StyleSheet.create({
   flexOne: { flex: 1 },
-  flexOneJustifyEnd: { flex: 1, justifyContent: 'flex-end' },
   container: { flex: 1, backgroundColor: '#fff' },
   header: { padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee' },
   title: { fontSize: 28, fontWeight: 'bold', color: '#333' },
   subtitle: { fontSize: 16, color: '#666', marginTop: 5 },
-  listContent: { paddingHorizontal: 20, paddingBottom: 80 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 100 }, // Added more padding to bottom
   itemContainer: { backgroundColor: '#f9f9f9', padding: 15, borderRadius: 10, marginVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   itemDetails: { flex: 1 },
   itemName: { fontSize: 18, fontWeight: '500', marginBottom: 4 },
@@ -259,7 +255,7 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 22, fontWeight: 'bold', color: '#555', marginTop: 15 },
   emptySubtitle: { fontSize: 16, color: '#888', textAlign: 'center', marginTop: 5 },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalContent: { backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 3, paddingBottom: 30 },
+  modalContent: { backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 3, paddingBottom: Platform.OS === 'ios' ? 30 : 20 },
   modalTitle: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
   modalInput: { backgroundColor: '#f2f2f2', borderRadius: 10, padding: 15, fontSize: 16, marginBottom: 12, width: '100%' },
   inputRow: { flexDirection: 'row', marginBottom: 12, width: '100%' },
@@ -272,7 +268,8 @@ const styles = StyleSheet.create({
   buttonText: { color: 'white', fontSize: 18, fontWeight: '600' },
   cancelButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#007AFF' },
   cancelButtonText: { color: '#007AFF' },
-  addButtonContainer: { paddingHorizontal: 20, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#eee', backgroundColor: '#fff', position: 'absolute', bottom: 0, left: 0, right: 0 },
+  addButtonContainer: { paddingHorizontal: 20, paddingVertical: 15, borderTopWidth: 1, borderTopColor: '#eee', backgroundColor: '#fff', position: 'absolute', bottom: 0, left: 0, right: 0 },
   addButton: { backgroundColor: '#007AFF', paddingVertical: 15, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   addButtonText: { color: 'white', fontSize: 18, fontWeight: '600', marginLeft: 8 },
 });
+
