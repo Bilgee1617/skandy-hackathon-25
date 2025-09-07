@@ -217,68 +217,68 @@ export default function IngredientsScreen() {
         </View>
 
       {/* --- Edit Quantity Modal --- */}
-        <Modal animationType="slide" transparent={true} visible={editModalVisible} onRequestClose={handleCloseEditModal}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOne}>
-                <TouchableWithoutFeedback onPress={handleCloseEditModal}>
-                    <View style={styles.modalOverlay}>
-                        <TouchableWithoutFeedback>
-                            <View style={styles.modalContent}>
-                                <Text style={styles.modalTitle}>{selectedIngredient?.name}</Text>
-                                <View style={styles.inputRow}>
-                                    <View style={styles.inputContainer}>
-                                        <Text style={styles.label}>Quantity</Text>
-                                        <TextInput style={[styles.modalInput, styles.quantityInput]} onChangeText={setEditQuantity} value={editQuantity} keyboardType="numeric" placeholder="Quantity" placeholderTextColor="#888"/>
-                                    </View>
-                                    <View style={styles.inputContainer}>
-                                        <Text style={styles.label}>Unit</Text>
-                                        <TextInput style={[styles.modalInput, styles.unitInput]} onChangeText={setEditUnit} value={editUnit} placeholder="Unit" autoCapitalize="none" placeholderTextColor="#888"/>
-                                    </View>
+      <Modal animationType="slide" transparent={true} visible={editModalVisible} onRequestClose={handleCloseEditModal}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOne}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <View style={styles.modalOverlay}>
+                    <TouchableWithoutFeedback>
+                        <View style={styles.modalContent}>
+                            <Text style={styles.modalTitle}>{selectedIngredient?.name}</Text>
+                            <View style={styles.inputRow}>
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.label}>Quantity</Text>
+                                    <TextInput style={[styles.modalInput, styles.quantityInput]} onChangeText={setEditQuantity} value={editQuantity} keyboardType="numeric" placeholder="Quantity" placeholderTextColor="#888"/>
                                 </View>
-                                <View style={styles.quickActionsContainer}>
-                                    <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(Math.max(0, parseFloat(q || '0') - 1)))}><Text style={styles.quickActionButtonText}>-1</Text></TouchableOpacity>
-                                    <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity('0')}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
-                                    <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.label}>Unit</Text>
+                                    <TextInput style={[styles.modalInput, styles.unitInput]} onChangeText={setEditUnit} value={editUnit} placeholder="Unit" autoCapitalize="none" placeholderTextColor="#888"/>
                                 </View>
-                                <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={loading}><Text style={styles.buttonText}>Save</Text></TouchableOpacity>
-                                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseEditModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
                             </View>
-                        </TouchableWithoutFeedback>
-                    </View>
-                </TouchableWithoutFeedback>
-            </KeyboardAvoidingView>
+                            <View style={styles.quickActionsContainer}>
+                                <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(Math.max(0, parseFloat(q || '0') - 1)))}><Text style={styles.quickActionButtonText}>-1</Text></TouchableOpacity>
+                                <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity('0')}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
+                                <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
+                            </View>
+                            <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={loading}><Text style={styles.buttonText}>Save</Text></TouchableOpacity>
+                            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseEditModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </View>
+            </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* --- Add Ingredient Modal --- */}
       <Modal animationType="slide" transparent={true} visible={addModalVisible} onRequestClose={handleCloseAddModal}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOne}>
-                <TouchableWithoutFeedback onPress={handleCloseAddModal}>
-                    <View style={styles.modalOverlay}>
-                        <TouchableWithoutFeedback>
-                            <View style={styles.modalContent}>
-                                <Text style={styles.modalTitle}>Add New Ingredient</Text>
-                                <Text style={styles.label}>Ingredient Name</Text>
-                                <TextInput style={styles.modalInput} placeholder="e.g., Milk" placeholderTextColor="#888" value={newItemName} onChangeText={setNewItemName} />
-                                <View style={styles.inputRow}>
-                                    <View style={styles.inputContainer}>
-                                        <Text style={styles.label}>Quantity</Text>
-                                        <TextInput style={[styles.modalInput, {flex: 2, marginRight: 10}]} placeholder="e.g, 1" placeholderTextColor="#888" value={newItemQuantity} onChangeText={setNewItemQuantity} keyboardType="numeric"/>
-                                    </View>
-                                    <View style={styles.inputContainer}>
-                                        <Text style={styles.label}>Unit</Text>
-                                        <TextInput style={[styles.modalInput, {flex: 1}]} placeholder="e.g., L, g" placeholderTextColor="#888" value={newItemUnit} onChangeText={setNewItemUnit} autoCapitalize="none"/>
-                                    </View>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexOne}>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <View style={styles.modalOverlay}>
+                    <TouchableWithoutFeedback>
+                        <View style={styles.modalContent}>
+                            <Text style={styles.modalTitle}>Add New Ingredient</Text>
+                            <Text style={styles.label}>Ingredient Name</Text>
+                            <TextInput style={styles.modalInput} placeholder="e.g., Milk" placeholderTextColor="#888" value={newItemName} onChangeText={setNewItemName} />
+                            <View style={styles.inputRow}>
+                                <View style={[styles.inputContainer, {flex: 2, marginRight: 10}]}>
+                                    <Text style={styles.label}>Quantity</Text>
+                                    <TextInput style={styles.modalInput} placeholder="e.g, 1" placeholderTextColor="#888" value={newItemQuantity} onChangeText={setNewItemQuantity} keyboardType="numeric"/>
                                 </View>
-                                <Text style={styles.label}>Expiration Date</Text>
-                                <TextInput style={styles.modalInput} placeholder="MM-DD-YYYY" placeholderTextColor="#888" value={newItemExpDate} onChangeText={setNewItemExpDate} />
-                                <Text style={styles.label}>Bought On</Text>
-                                <TextInput style={styles.modalInput} placeholder="MM-DD-YYYY" placeholderTextColor="#888" value={newItemBoughtOn} onChangeText={setNewItemBoughtOn} />
-                                <TouchableOpacity style={styles.button} onPress={handleAddItem} disabled={loading}><Text style={styles.buttonText}>Add to Pantry</Text></TouchableOpacity>
-                                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseAddModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
+                                <View style={[styles.inputContainer, {flex: 1}]}>
+                                    <Text style={styles.label}>Unit</Text>
+                                    <TextInput style={styles.modalInput} placeholder="e.g., L, g" placeholderTextColor="#888" value={newItemUnit} onChangeText={setNewItemUnit} autoCapitalize="none"/>
+                                </View>
                             </View>
-                        </TouchableWithoutFeedback>
-                    </View>
-                </TouchableWithoutFeedback>
-            </KeyboardAvoidingView>
+                            <Text style={styles.label}>Expiration Date</Text>
+                            <TextInput style={styles.modalInput} placeholder="MM-DD-YYYY" placeholderTextColor="#888" value={newItemExpDate} onChangeText={setNewItemExpDate} />
+                            <Text style={styles.label}>Bought On</Text>
+                            <TextInput style={styles.modalInput} placeholder="MM-DD-YYYY" placeholderTextColor="#888" value={newItemBoughtOn} onChangeText={setNewItemBoughtOn} />
+                            <TouchableOpacity style={styles.button} onPress={handleAddItem} disabled={loading}><Text style={styles.buttonText}>Add to Pantry</Text></TouchableOpacity>
+                            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseAddModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
+                        </View>
+                    </TouchableWithoutFeedback>
+                </View>
+            </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
     </SafeAreaView>
@@ -308,8 +308,8 @@ const styles = StyleSheet.create({
   modalInput: { backgroundColor: '#f2f2f2', borderRadius: 10, padding: 15, fontSize: 16, marginBottom: 12, width: '100%' },
   inputRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
   inputContainer: { flex: 1, marginRight: 5 },
-  quantityInput: { flex: 2, marginRight: 10 },
-  unitInput: { flex: 1 },
+  quantityInput: { minWidth: 100 },
+  unitInput: { minWidth: 80 },
   quickActionsContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
   quickActionButton: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#f2f2f2', borderRadius: 10 },
   quickActionButtonText: { fontSize: 16, color: '#007AFF', fontWeight: '600' },
