@@ -4,6 +4,7 @@ import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { extractTextFromReceipt, extractTextFromReceiptMock, OCRResult } from '../lib/ocrService';
+import { getOCRConfig, getOCRMethodName } from '../lib/ocrConfig';
 
 interface CameraScreenProps {
   onClose: () => void;
@@ -66,14 +67,17 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
   const processReceiptImage = async (imageUri: string) => {
     try {
       setIsScanning(true);
-      setOcrStatus('Processing image...');
+      const config = getOCRConfig();
+      const methodName = getOCRMethodName(config.method);
+      
+      setOcrStatus(`Processing image with ${methodName}...`);
       
       // Simulate processing time for better UX
       await new Promise(resolve => setTimeout(resolve, 1000));
-      setOcrStatus('Extracting text...');
+      setOcrStatus(`Extracting text with ${methodName}...`);
       
-      // Use mock OCR for now (you can switch to real OCR later)
-      const ocrResult: OCRResult = await extractTextFromReceiptMock(imageUri);
+      // Use real OCR (Tesseract.js or Google Vision API)
+      const ocrResult: OCRResult = await extractTextFromReceipt(imageUri);
       
       setOcrStatus('Analyzing ingredients...');
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -84,12 +88,24 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
       setOcrStatus('Complete!');
       await new Promise(resolve => setTimeout(resolve, 300));
       
-      // Show results
+      // Show results with smart analysis
       if (allIngredients.length > 0) {
         const ingredientsList = allIngredients.join('\n• ');
+        const smartAnalysis = ocrResult.smartAnalysis;
+        
+        let message = `Found ${allIngredients.length} food ingredients:\n\n• ${ingredientsList}`;
+        
+        if (smartAnalysis) {
+          message += `\n\n📊 Analysis Details:`;
+          message += `\n• Confidence: ${Math.round(smartAnalysis.confidence * 100)}%`;
+          message += `\n• Store: ${smartAnalysis.storeInfo.length > 0 ? smartAnalysis.storeInfo[0] : 'Unknown'}`;
+          message += `\n• Total: ${smartAnalysis.totalAmount || 'Not found'}`;
+          message += `\n• Prices found: ${smartAnalysis.prices.length}`;
+        }
+        
         Alert.alert(
-          'Ingredients Found!',
-          `Found ${allIngredients.length} ingredients:\n\n• ${ingredientsList}`,
+          '🍎 Smart Ingredient Detection',
+          message,
           [
             {
               text: 'Add to Inventory',
@@ -97,6 +113,30 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
                 // TODO: Add ingredients to Supabase database
                 console.log('Adding ingredients to inventory:', allIngredients);
                 onClose();
+              },
+            },
+            {
+              text: 'View Analysis',
+              onPress: () => {
+                if (smartAnalysis) {
+                  const analysisDetails = `Smart Analysis Results:\n\n` +
+                    `Food Ingredients (${smartAnalysis.ingredients.length}):\n` +
+                    smartAnalysis.ingredients.map(ing => `• ${ing.name} (${ing.category}, ${Math.round(ing.confidence * 100)}%)`).join('\n') +
+                    `\n\nStore Info: ${smartAnalysis.storeInfo.join(', ')}\n` +
+                    `Prices: ${smartAnalysis.prices.join(', ')}\n` +
+                    `Total: ${smartAnalysis.totalAmount || 'Not found'}`;
+                  
+                  Alert.alert('Detailed Analysis', analysisDetails, [
+                    { text: 'OK' },
+                    {
+                      text: 'Add Ingredients',
+                      onPress: () => {
+                        console.log('Adding ingredients to inventory:', allIngredients);
+                        onClose();
+                      },
+                    },
+                  ]);
+                }
               },
             },
             {

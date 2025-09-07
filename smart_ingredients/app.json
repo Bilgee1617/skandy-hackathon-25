@@ -41,6 +41,9 @@
         }
       ]
     ],
-    "scheme": "nurtree"
+    "scheme": "nurtree",
+    "extra": {
+      "googleVisionApiKey": "AIzaSyDplYITl1QVNP657IVyAfmafDDvT-6eMCs"
+    }
   }
 }
