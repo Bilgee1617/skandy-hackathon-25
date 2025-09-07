@@ -27,8 +27,23 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan receipts and barcodes."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to select receipt images."
+        }
+      ]
     ],
-    "scheme": "nurtree"
+    "scheme": "nurtree",
+    "extra": {
+      "googleVisionApiKey": "AIzaSyDplYITl1QVNP657IVyAfmafDDvT-6eMCs"
+    }
   }
 }
