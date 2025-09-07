@@ -13,6 +13,7 @@ interface Ingredient {
   expiration_date: string;
   quantity: number;
   unit: string;
+  user_id: string;
   profiles: {
     username: string;
   } | null;
@@ -68,25 +69,55 @@ export default function CommunityScreen() {
   }, [user]);
 
   const fetchExpiringIngredients = async () => {
-    if(loading || !user) return;
+    if (loading || !user) return;
     setLoading(true);
 
     const today = new Date();
     const twoDaysFromNow = new Date(new Date().setDate(today.getDate() + 2));
     const isoDate = twoDaysFromNow.toISOString();
 
-    const { data, error } = await supabase
-      .from('ingredients')
-      .select('*, profiles(username)')
-      .lte('expiration_date', isoDate)
-      .neq('user_id', user.id)
-      .order('expiration_date', { ascending: true, nullsFirst: false });
+    const { data: ingredientsData, error: ingredientsError } = await supabase
+        .from('ingredients')
+        .select('*')
+        .lte('expiration_date', isoDate)
+        .neq('user_id', user.id)
+        .order('expiration_date', { ascending: true, nullsFirst: false });
 
-    if (error) {
-        Alert.alert('Error fetching ingredients', error.message);
-    } else {
-        setIngredients(data as any[]);
+    if (ingredientsError) {
+        Alert.alert('Error fetching ingredients', ingredientsError.message);
+        setLoading(false);
+        return;
     }
+
+    if (!ingredientsData || ingredientsData.length === 0) {
+        setIngredients([]);
+        setLoading(false);
+        return;
+    }
+
+    const userIds = [...new Set(ingredientsData.map(ing => ing.user_id))];
+
+    const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', userIds);
+
+    if (profilesError) {
+        console.error('Error fetching profiles:', profilesError.message);
+    }
+
+    const profilesMap = new Map(profilesData?.map(p => [p.id, p.username]) || []);
+
+    const combinedData = ingredientsData.map(ingredient => {
+        return {
+            ...ingredient,
+            profiles: {
+                username: profilesMap.get(ingredient.user_id) || 'Unknown'
+            }
+        };
+    });
+
+    setIngredients(combinedData as Ingredient[]);
     setLoading(false);
   };
 
