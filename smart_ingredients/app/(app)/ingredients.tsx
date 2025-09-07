@@ -8,7 +8,33 @@ interface Ingredient {
   name: string;
   expiration_date: string;
   bought_on: string;
+  quantity: number;
+  unit: string;
 }
+
+// --- Helper Function to Calculate Expiration ---
+const getExpirationInfo = (expirationDate: string) => {
+  if (!expirationDate) {
+    return { text: 'No expiration date', color: '#666', days: Infinity };
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize today's date
+  const expDate = new Date(expirationDate);
+  const diffTime = expDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return { text: `Expired ${Math.abs(diffDays)} days ago`, color: '#d32f2f', days: diffDays };
+  }
+  if (diffDays === 0) {
+    return { text: 'Expires today', color: '#d32f2f', days: diffDays };
+  }
+  if (diffDays <= 7) {
+    return { text: `Expires in ${diffDays} days`, color: '#ed6c02', days: diffDays };
+  }
+  return { text: `Expires in ${diffDays} days`, color: '#2e7d32', days: diffDays };
+};
+// -----------------------------------------
 
 export default function IngredientsScreen() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -23,7 +49,8 @@ export default function IngredientsScreen() {
     const { data, error } = await supabase
       .from('ingredients')
       .select('*')
-      .order('expiration_date', { ascending: true });
+      // Order by expiration date to show soon-to-expire items first
+      .order('expiration_date', { ascending: true, nullsFirst: false });
 
     if (error) {
       Alert.alert('Error fetching ingredients', error.message);
@@ -33,15 +60,29 @@ export default function IngredientsScreen() {
     setLoading(false);
   };
 
-  const renderItem = ({ item }: { item: Ingredient }) => (
-    <View style={styles.itemContainer}>
-      <View>
-        <Text style={styles.itemName}>{item.name}</Text>
-        {item.expiration_date && <Text style={styles.itemDate}>Expires: {new Date(item.expiration_date).toLocaleDateString()}</Text>}
-        <Text style={styles.itemDate}>Bought: {new Date(item.bought_on).toLocaleDateString()}</Text>
+  const renderItem = ({ item }: { item: Ingredient }) => {
+    const expiration = getExpirationInfo(item.expiration_date);
+
+    return (
+      <View style={styles.itemContainer}>
+        <View style={styles.itemDetails}>
+          <Text style={styles.itemName}>{item.name}</Text>
+          
+          {/* Expiration Info */}
+          <Text style={[styles.itemDate, { color: expiration.color, fontWeight: 'bold' }]}>
+            {expiration.text}
+          </Text>
+          <Text style={styles.itemSubDate}>
+            ({item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : 'N/A'})
+          </Text>
+
+        </View>
+        
+        {/* Quantity and Unit */}
+        {item.quantity && item.unit && <Text style={styles.itemQuantity}>{`${item.quantity} ${item.unit}`}</Text>}
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -96,14 +137,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  itemDetails: {
+    flex: 1,
+  },
   itemName: {
     fontSize: 18,
     fontWeight: '500',
+    marginBottom: 4,
   },
   itemDate: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+  },
+  itemSubDate: {
+    fontSize: 12,
+    color: '#888',
+  },
+  itemQuantity: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    paddingLeft: 10,
   },
   emptyText: {
     textAlign: 'center',
