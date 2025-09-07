@@ -47,8 +47,8 @@ export default function LoginScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
             <Ionicons name="nutrition" size={80} color="#007AFF" />
-            <Text style={styles.title}>Smart Ingredients</Text>
-            <Text style={styles.subtitle}>Your personal ingredient assistant</Text>
+            <Text style={styles.title}>PantryPal</Text>
+            <Text style={styles.subtitle}>Don't let good food go bad</Text>
         </View>
 
         <View style={styles.inputContainer}>
