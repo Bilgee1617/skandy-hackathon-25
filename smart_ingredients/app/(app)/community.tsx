@@ -81,6 +81,31 @@ export default function CommunityScreen() {
   }, []);
 
   useEffect(() => {
+    const requestLocationPermission = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          setLocationPermission(true);
+          const location = await Location.getCurrentPositionAsync({});
+          setUserLocation(location);
+        } else {
+          setLocationPermission(false);
+          Alert.alert(
+            'Location Permission',
+            'Location permission is needed to show distances to food items. You can enable it in your device settings.',
+            [{ text: 'OK' }]
+          );
+        }
+      } catch (error) {
+        console.error('Error getting location:', error);
+        setLocationPermission(false);
+      }
+    };
+
+    requestLocationPermission();
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
 
     fetchExpiringIngredients();
@@ -100,6 +125,106 @@ export default function CommunityScreen() {
     if (loading || !user) return;
     setLoading(true);
 
+    // Create dummy data with location information for testing
+    const dummyIngredients: Ingredient[] = [
+      {
+        id: '1',
+        name: 'Fresh Bananas',
+        expiration_date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day from now
+        quantity: 5,
+        unit: 'ea',
+        user_id: 'user1',
+        latitude: userLocation ? userLocation.coords.latitude + 0.01 : 37.7749, // ~1km away
+        longitude: userLocation ? userLocation.coords.longitude + 0.01 : -122.4194,
+        profiles: { username: 'Sarah' }
+      },
+      {
+        id: '2',
+        name: 'Organic Milk',
+        expiration_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
+        quantity: 1,
+        unit: 'gallon',
+        user_id: 'user2',
+        latitude: userLocation ? userLocation.coords.latitude - 0.005 : 37.7849, // ~500m away
+        longitude: userLocation ? userLocation.coords.longitude - 0.005 : -122.4094,
+        profiles: { username: 'Mike' }
+      },
+      {
+        id: '3',
+        name: 'Bell Peppers',
+        expiration_date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day from now
+        quantity: 3,
+        unit: 'ea',
+        user_id: 'user3',
+        latitude: userLocation ? userLocation.coords.latitude + 0.02 : 37.7849, // ~2km away
+        longitude: userLocation ? userLocation.coords.longitude - 0.01 : -122.4294,
+        profiles: { username: 'Emma' }
+      },
+      {
+        id: '4',
+        name: 'Greek Yogurt',
+        expiration_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), // 3 days from now
+        quantity: 2,
+        unit: 'pack',
+        user_id: 'user4',
+        latitude: userLocation ? userLocation.coords.latitude - 0.015 : 37.7649, // ~1.5km away
+        longitude: userLocation ? userLocation.coords.longitude + 0.02 : -122.3994,
+        profiles: { username: 'Alex' }
+      },
+      {
+        id: '5',
+        name: 'Fresh Spinach',
+        expiration_date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day from now
+        quantity: 1,
+        unit: 'bunch',
+        user_id: 'user5',
+        latitude: userLocation ? userLocation.coords.latitude + 0.03 : 37.7949, // ~3km away
+        longitude: userLocation ? userLocation.coords.longitude + 0.03 : -122.4494,
+        profiles: { username: 'Lisa' }
+      },
+      {
+        id: '6',
+        name: 'Bread Loaf',
+        expiration_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
+        quantity: 1,
+        unit: 'loaf',
+        user_id: 'user6',
+        latitude: userLocation ? userLocation.coords.latitude - 0.008 : 37.7649, // ~800m away
+        longitude: userLocation ? userLocation.coords.longitude - 0.008 : -122.4094,
+        profiles: { username: 'David' }
+      }
+    ];
+
+    // Calculate distances for dummy data
+    const combinedData = dummyIngredients.map(ingredient => {
+        let distance: number | undefined;
+        
+        // Calculate distance if user location is available and ingredient has coordinates
+        if (userLocation && ingredient.latitude && ingredient.longitude) {
+            distance = calculateDistance(
+                userLocation.coords.latitude,
+                userLocation.coords.longitude,
+                ingredient.latitude,
+                ingredient.longitude
+            );
+        }
+
+        return {
+            ...ingredient,
+            distance
+        };
+    });
+
+    // Sort by distance if location is available, otherwise by expiration date
+    const sortedData = userLocation 
+        ? combinedData.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity))
+        : combinedData.sort((a, b) => new Date(a.expiration_date).getTime() - new Date(b.expiration_date).getTime());
+
+    setIngredients(sortedData);
+    setLoading(false);
+
+    // Uncomment the code below to use real database data instead of dummy data
+    /*
     const today = new Date();
     const twoDaysFromNow = new Date(new Date().setDate(today.getDate() + 2));
     const isoDate = twoDaysFromNow.toISOString();
@@ -137,16 +262,35 @@ export default function CommunityScreen() {
     const profilesMap = new Map(profilesData?.map(p => [p.id, p.username]) || []);
 
     const combinedData = ingredientsData.map(ingredient => {
+        let distance: number | undefined;
+        
+        // Calculate distance if user location is available and ingredient has coordinates
+        if (userLocation && ingredient.latitude && ingredient.longitude) {
+            distance = calculateDistance(
+                userLocation.coords.latitude,
+                userLocation.coords.longitude,
+                ingredient.latitude,
+                ingredient.longitude
+            );
+        }
+
         return {
             ...ingredient,
+            distance,
             profiles: {
                 username: profilesMap.get(ingredient.user_id) || 'Unknown'
             }
         };
     });
 
-    setIngredients(combinedData as Ingredient[]);
+    // Sort by distance if location is available, otherwise by expiration date
+    const sortedData = userLocation 
+        ? combinedData.sort((a, b) => (a.distance || Infinity) - (b.distance || Infinity))
+        : combinedData;
+
+    setIngredients(sortedData as Ingredient[]);
     setLoading(false);
+    */
   };
 
   const renderItem = ({ item }: { item: Ingredient }) => {
@@ -159,17 +303,48 @@ export default function CommunityScreen() {
           <Text style={styles.itemName}>{item.name}</Text>
           <Text style={styles.itemQuantity}>{item.quantity} {item.unit}</Text>
           <Text style={styles.itemOwner}>From: {owner}</Text>
+          {item.distance !== undefined && (
+            <View style={styles.distanceContainer}>
+              <Ionicons name="location-outline" size={14} color="#007AFF" />
+              <Text style={styles.distanceText}>{formatDistance(item.distance)} away</Text>
+            </View>
+          )}
         </View>
-        <Text style={[styles.itemExpiration, { color }]}>{text}</Text>
+        <View style={styles.rightSection}>
+          <Text style={[styles.itemExpiration, { color }]}>{text}</Text>
+        </View>
       </View>
     );
+  };
+
+  const refreshLocation = async () => {
+    if (!locationPermission) return;
+    
+    try {
+      const location = await Location.getCurrentPositionAsync({});
+      setUserLocation(location);
+      // Refresh ingredients to recalculate distances
+      if (user) {
+        fetchExpiringIngredients();
+      }
+    } catch (error) {
+      console.error('Error refreshing location:', error);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
         <View style={styles.header}>
             <Text style={styles.title}>Community</Text>
-            <Text style={styles.subtitle}>See what others are sharing!</Text>
+            <Text style={styles.subtitle}>
+              {locationPermission ? 'Food near you' : 'See what others are sharing!'}
+            </Text>
+            {locationPermission && (
+              <TouchableOpacity style={styles.locationButton} onPress={refreshLocation}>
+                <Ionicons name="refresh" size={16} color="#007AFF" />
+                <Text style={styles.locationButtonText}>Refresh Location</Text>
+              </TouchableOpacity>
+            )}
         </View>
         {loading && <ActivityIndicator />}
         <FlatList
@@ -212,10 +387,11 @@ const styles = StyleSheet.create({
       marginVertical: 8, 
       flexDirection: 'row', 
       justifyContent: 'space-between', 
-      alignItems: 'center' 
+      alignItems: 'flex-start' 
   },
   itemInfo: {
       flex: 1,
+      marginRight: 10,
   },
   itemName: { 
       fontSize: 18, 
@@ -232,8 +408,37 @@ const styles = StyleSheet.create({
       color: '#888',
       marginTop: 5,
   },
+  distanceContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+  },
+  distanceText: {
+      fontSize: 12,
+      color: '#007AFF',
+      marginLeft: 4,
+      fontWeight: '500',
+  },
+  rightSection: {
+      alignItems: 'flex-end',
+  },
   itemExpiration: {
       fontSize: 14,
       fontWeight: 'bold',
+  },
+  locationButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#f0f8ff',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      marginTop: 10,
+  },
+  locationButtonText: {
+      fontSize: 12,
+      color: '#007AFF',
+      marginLeft: 4,
+      fontWeight: '500',
   },
 });

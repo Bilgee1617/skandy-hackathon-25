@@ -39,6 +39,12 @@
         {
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos to select receipt images."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to show distances to nearby food items."
+        }
       ]
     ],
     "scheme": "nurtree",
