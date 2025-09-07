@@ -75,13 +75,31 @@ export default function ProfileScreen() {
     };
 
     const handleSignOut = async () => {
-        setLoading(true);
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            Alert.alert('Error signing out', error.message);
-        }
-        // The root layout will handle redirecting the user to the login screen.
-        setLoading(false);
+        Alert.alert(
+            'Sign Out',
+            'Are you sure you want to sign out?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Sign Out',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setLoading(true);
+                        const { error } = await supabase.auth.signOut();
+                        if (error) {
+                            Alert.alert('Error signing out', error.message);
+                            setLoading(false);
+                        } else {
+                            // Success message - the root layout will handle redirecting
+                            Alert.alert('Success', 'You have been signed out successfully.');
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     return (
