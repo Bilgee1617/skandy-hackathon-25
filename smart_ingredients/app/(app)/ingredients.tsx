@@ -34,17 +34,35 @@ const getExpirationInfo = (expirationDate: string) => {
   return { text: `Expires in ${diffDays} days`, color: '#2e7d32', days: diffDays };
 };
 
-const toISODateString = (date: Date) => date.toISOString().split('T')[0];
-
-const formatDisplayDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    const parts = dateString.split('-').map(part => parseInt(part, 10));
-    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+const toISODateString = (date: Date) => {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const year = date.getFullYear();
     return `${month}-${day}-${year}`;
 };
+
+const formatDisplayDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    const parts = dateString.split('-');
+    if (parts.length === 3) {
+        const [year, month, day] = parts;
+        return `${month}-${day}-${year}`;
+    }
+    return dateString; // Return original if not in YYYY-MM-DD format
+};
+
+const parseInputDate = (dateString: string) => {
+    const parts = dateString.split('-');
+    if (parts.length === 3) {
+        const [month, day, year] = parts;
+        // Basic validation, can be improved
+        if (month.length === 2 && day.length === 2 && year.length === 4) {
+            return `${year}-${month}-${day}`;
+        }
+    }
+    return null; // Return null if format is incorrect
+};
+
 
 export default function IngredientsScreen() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -126,6 +144,20 @@ export default function IngredientsScreen() {
         Alert.alert('Invalid Quantity', 'Please enter a valid, positive number.');
         return;
     }
+
+    const expDateISO = newItemExpDate ? parseInputDate(newItemExpDate) : null;
+    if (newItemExpDate && !expDateISO) {
+        Alert.alert('Invalid Expiration Date', 'Please use MM-DD-YYYY format.');
+        return;
+    }
+
+    const boughtOnISO = newItemBoughtOn ? parseInputDate(newItemBoughtOn) : toISODateString(new Date());
+    if (newItemBoughtOn && !boughtOnISO) {
+        Alert.alert('Invalid Bought On Date', 'Please use MM-DD-YYYY format.');
+        return;
+    }
+
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
         Alert.alert('Not Authenticated', 'You must be logged in to add an ingredient.');
@@ -136,8 +168,8 @@ export default function IngredientsScreen() {
         name: newItemName.trim(),
         quantity: quantityValue,
         unit: newItemUnit.trim(),
-        expiration_date: newItemExpDate || null,
-        bought_on: newItemBoughtOn || toISODateString(new Date()),
+        expiration_date: expDateISO,
+        bought_on: boughtOnISO,
         user_id: session.user.id,
     }]);
     if (error) Alert.alert('Error adding ingredient', error.message);
@@ -193,12 +225,18 @@ export default function IngredientsScreen() {
                             <View style={styles.modalContent}>
                                 <Text style={styles.modalTitle}>{selectedIngredient?.name}</Text>
                                 <View style={styles.inputRow}>
-                                    <TextInput style={[styles.modalInput, styles.quantityInput]} onChangeText={setEditQuantity} value={editQuantity} keyboardType="numeric" placeholder="Quantity" placeholderTextColor="#888"/>
-                                    <TextInput style={[styles.modalInput, styles.unitInput]} onChangeText={setEditUnit} value={editUnit} placeholder="Unit" autoCapitalize="none" placeholderTextColor="#888"/>
+                                    <View style={styles.inputContainer}>
+                                        <Text style={styles.label}>Quantity</Text>
+                                        <TextInput style={[styles.modalInput, styles.quantityInput]} onChangeText={setEditQuantity} value={editQuantity} keyboardType="numeric" placeholder="Quantity" placeholderTextColor="#888"/>
+                                    </View>
+                                    <View style={styles.inputContainer}>
+                                        <Text style={styles.label}>Unit</Text>
+                                        <TextInput style={[styles.modalInput, styles.unitInput]} onChangeText={setEditUnit} value={editUnit} placeholder="Unit" autoCapitalize="none" placeholderTextColor="#888"/>
+                                    </View>
                                 </View>
                                 <View style={styles.quickActionsContainer}>
                                     <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(Math.max(0, parseFloat(q || '0') - 1)))}><Text style={styles.quickActionButtonText}>-1</Text></TouchableOpacity>
-                                    <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity('0' )}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
+                                    <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity('0')}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
                                     <TouchableOpacity style={styles.quickActionButton} onPress={() => setEditQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
                                 </View>
                                 <TouchableOpacity style={styles.button} onPress={handleSaveEdit} disabled={loading}><Text style={styles.buttonText}>Save</Text></TouchableOpacity>
@@ -218,13 +256,22 @@ export default function IngredientsScreen() {
                         <TouchableWithoutFeedback>
                             <View style={styles.modalContent}>
                                 <Text style={styles.modalTitle}>Add New Ingredient</Text>
-                                <TextInput style={styles.modalInput} placeholder="Ingredient Name (e.g., Milk)" placeholderTextColor="#888" value={newItemName} onChangeText={setNewItemName} />
+                                <Text style={styles.label}>Ingredient Name</Text>
+                                <TextInput style={styles.modalInput} placeholder="e.g., Milk" placeholderTextColor="#888" value={newItemName} onChangeText={setNewItemName} />
                                 <View style={styles.inputRow}>
-                                    <TextInput style={[styles.modalInput, {flex: 2, marginRight: 10}]} placeholder="Quantity" placeholderTextColor="#888" value={newItemQuantity} onChangeText={setNewItemQuantity} keyboardType="numeric"/>
-                                    <TextInput style={[styles.modalInput, {flex: 1}]} placeholder="Unit (e.g., L, g)" placeholderTextColor="#888" value={newItemUnit} onChangeText={setNewItemUnit} autoCapitalize="none"/>
+                                    <View style={styles.inputContainer}>
+                                        <Text style={styles.label}>Quantity</Text>
+                                        <TextInput style={[styles.modalInput, {flex: 2, marginRight: 10}]} placeholder="e.g, 1" placeholderTextColor="#888" value={newItemQuantity} onChangeText={setNewItemQuantity} keyboardType="numeric"/>
+                                    </View>
+                                    <View style={styles.inputContainer}>
+                                        <Text style={styles.label}>Unit</Text>
+                                        <TextInput style={[styles.modalInput, {flex: 1}]} placeholder="e.g., L, g" placeholderTextColor="#888" value={newItemUnit} onChangeText={setNewItemUnit} autoCapitalize="none"/>
+                                    </View>
                                 </View>
-                                <TextInput style={styles.modalInput} placeholder="Expiration Date (MM-DD-YYYY)" placeholderTextColor="#888" value={newItemExpDate} onChangeText={setNewItemExpDate} />
-                                <TextInput style={styles.modalInput} placeholder="Bought On Date (MM-DD-YYYY)" placeholderTextColor="#888" value={newItemBoughtOn} onChangeText={setNewItemBoughtOn} />
+                                <Text style={styles.label}>Expiration Date</Text>
+                                <TextInput style={styles.modalInput} placeholder="MM-DD-YYYY" placeholderTextColor="#888" value={newItemExpDate} onChangeText={setNewItemExpDate} />
+                                <Text style={styles.label}>Bought On</Text>
+                                <TextInput style={styles.modalInput} placeholder="MM-DD-YYYY" placeholderTextColor="#888" value={newItemBoughtOn} onChangeText={setNewItemBoughtOn} />
                                 <TouchableOpacity style={styles.button} onPress={handleAddItem} disabled={loading}><Text style={styles.buttonText}>Add to Pantry</Text></TouchableOpacity>
                                 <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseAddModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
                             </View>
@@ -244,7 +291,7 @@ const styles = StyleSheet.create({
   header: { padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee' },
   title: { fontSize: 28, fontWeight: 'bold', color: '#333' },
   subtitle: { fontSize: 16, color: '#666', marginTop: 5 },
-  listContent: { paddingHorizontal: 20, paddingBottom: 100 }, // Added more padding to bottom
+  listContent: { paddingHorizontal: 20, paddingBottom: 100 },
   itemContainer: { backgroundColor: '#f9f9f9', padding: 15, borderRadius: 10, marginVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   itemDetails: { flex: 1 },
   itemName: { fontSize: 18, fontWeight: '500', marginBottom: 4 },
@@ -257,8 +304,10 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 3, paddingBottom: Platform.OS === 'ios' ? 30 : 20 },
   modalTitle: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  label: { fontSize: 16, color: '#666', marginBottom: 8, marginLeft: 5 },
   modalInput: { backgroundColor: '#f2f2f2', borderRadius: 10, padding: 15, fontSize: 16, marginBottom: 12, width: '100%' },
-  inputRow: { flexDirection: 'row', marginBottom: 12, width: '100%' },
+  inputRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
+  inputContainer: { flex: 1, marginRight: 5 },
   quantityInput: { flex: 2, marginRight: 10 },
   unitInput: { flex: 1 },
   quickActionsContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
@@ -272,4 +321,3 @@ const styles = StyleSheet.create({
   addButton: { backgroundColor: '#007AFF', paddingVertical: 15, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   addButtonText: { color: 'white', fontSize: 18, fontWeight: '600', marginLeft: 8 },
 });
-
