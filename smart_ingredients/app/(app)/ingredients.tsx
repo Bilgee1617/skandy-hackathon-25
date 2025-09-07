@@ -42,6 +42,18 @@ const getExpirationInfo = (expirationDate: string) => {
 
 const toISODateString = (date: Date) => date.toISOString().split('T')[0];
 
+const formatDisplayDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    // Adjust for timezone to prevent off-by-one day errors
+    const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+    const correctedDate = new Date(date.getTime() + userTimezoneOffset);
+    const month = correctedDate.getMonth() + 1;
+    const day = correctedDate.getDate();
+    const year = correctedDate.getFullYear();
+    return `${month}/${day}/${year}`;
+};
+
 export default function IngredientsScreen() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(false);
@@ -147,6 +159,12 @@ export default function IngredientsScreen() {
         return;
     }
 
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        Alert.alert('Not Authenticated', 'You must be logged in to add an ingredient.');
+        return;
+    }
+
     setLoading(true);
     const { error } = await supabase.from('ingredients').insert([{
         name: newItemName.trim(),
@@ -154,6 +172,7 @@ export default function IngredientsScreen() {
         unit: newItemUnit.trim(),
         expiration_date: newItemExpDate || null,
         bought_on: newItemBoughtOn || toISODateString(new Date()),
+        user_id: session.user.id, // Associate ingredient with the logged-in user
     }]);
 
     if (error) {
@@ -174,7 +193,7 @@ export default function IngredientsScreen() {
             <View style={styles.itemDetails}>
               <Text style={styles.itemName}>{item.name}</Text>
               <Text style={[styles.itemDate, { color: expiration.color, fontWeight: 'bold' }]}>{expiration.text}</Text>
-              <Text style={styles.itemSubDate}>({item.expiration_date ? new Date(item.expiration_date).toLocaleDateString() : 'N/A'})</Text>
+              <Text style={styles.itemSubDate}>({formatDisplayDate(item.expiration_date)})</Text>
             </View>
             {item.quantity != null && item.unit && <Text style={styles.itemQuantity}>{`${item.quantity} ${item.unit}`}</Text>}
           </View>
@@ -245,13 +264,32 @@ export default function IngredientsScreen() {
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>
                     <Text style={styles.modalTitle}>Add New Ingredient</Text>
-                    <TextInput style={styles.modalInput} placeholder="Ingredient Name (e.g., Milk)" value={newItemName} onChangeText={setNewItemName} />
-                    <View style={styles.inputRow}>
-                        <TextInput style={styles.quantityInput} placeholder="Quantity" value={newItemQuantity} onChangeText={setNewItemQuantity} keyboardType="numeric"/>
-                        <TextInput style={styles.unitInput} placeholder="Unit (e.g., L, g, pcs)" value={newItemUnit} onChangeText={setNewItemUnit} autoCapitalize="none"/>
+                    
+                    <View style={styles.modalInputContainer}>
+                        <Ionicons name="pricetag-outline" size={20} color="#666" style={styles.inputIcon} />
+                        <TextInput style={styles.modalInput} placeholder="Ingredient Name (e.g., Milk)" value={newItemName} onChangeText={setNewItemName} />
                     </View>
-                    <TextInput style={styles.modalInput} placeholder="Expiration Date (YYYY-MM-DD)" value={newItemExpDate} onChangeText={setNewItemExpDate} />
-                    <TextInput style={styles.modalInput} placeholder="Bought On (YYYY-MM-DD)" value={newItemBoughtOn} onChangeText={setNewItemBoughtOn} />
+
+                    <View style={styles.inputRow}>
+                        <View style={[styles.modalInputContainer, styles.quantityInput]}>
+                            <Ionicons name="apps-outline" size={20} color="#666" style={styles.inputIcon} />
+                            <TextInput style={styles.modalInput} placeholder="Quantity" value={newItemQuantity} onChangeText={setNewItemQuantity} keyboardType="numeric"/>
+                        </View>
+                        <View style={[styles.modalInputContainer, styles.unitInput]}>
+                             <Ionicons name="options-outline" size={20} color="#666" style={styles.inputIcon} />
+                            <TextInput style={styles.modalInput} placeholder="Unit" value={newItemUnit} onChangeText={setNewItemUnit} autoCapitalize="none"/>
+                        </View>
+                    </View>
+
+                    <View style={styles.modalInputContainer}>
+                        <Ionicons name="calendar-outline" size={20} color="#666" style={styles.inputIcon} />
+                        <TextInput style={styles.modalInput} placeholder="Expiration Date (YYYY-MM-DD)" value={newItemExpDate} onChangeText={setNewItemExpDate} />
+                    </View>
+
+                    <View style={styles.modalInputContainer}>
+                        <Ionicons name="today-outline" size={20} color="#666" style={styles.inputIcon} />
+                        <TextInput style={styles.modalInput} placeholder="Bought On (YYYY-MM-DD)" value={newItemBoughtOn} onChangeText={setNewItemBoughtOn} />
+                    </View>
                     
                     <TouchableOpacity style={styles.button} onPress={handleAddItem} disabled={loading}><Text style={styles.buttonText}>Add to Pantry</Text></TouchableOpacity>
                     <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseAddModal}><Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text></TouchableOpacity>
@@ -271,7 +309,7 @@ const styles = StyleSheet.create({
   header: { padding: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee' },
   title: { fontSize: 28, fontWeight: 'bold', color: '#333' },
   subtitle: { fontSize: 16, color: '#666', marginTop: 5 },
-  listContent: { paddingHorizontal: 20 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 80 },
   itemContainer: { backgroundColor: '#f9f9f9', padding: 15, borderRadius: 10, marginVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   itemDetails: { flex: 1 },
   itemName: { fontSize: 18, fontWeight: '500', marginBottom: 4 },
@@ -284,10 +322,12 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { backgroundColor: 'white', padding: 20, borderTopLeftRadius: 20, borderTopRightRadius: 20, shadowColor: '#000', shadowOffset: { width: 0, height: -3 }, shadowOpacity: 0.1, shadowRadius: 3, paddingBottom: 30 },
   modalTitle: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
-  modalInput: { backgroundColor: '#f2f2f2', borderRadius: 10, padding: 15, fontSize: 16, marginBottom: 10 },
-  inputRow: { flexDirection: 'row', marginBottom: 10 },
-  quantityInput: { flex: 2, backgroundColor: '#f2f2f2', borderRadius: 10, padding: 15, fontSize: 16 },
-  unitInput: { flex: 1, backgroundColor: '#f2f2f2', borderRadius: 10, padding: 15, fontSize: 16, marginLeft: 10 },
+  modalInputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f2f2f2', borderRadius: 10, marginBottom: 12, paddingHorizontal: 15 },
+  inputIcon: { marginRight: 10 },
+  modalInput: { flex: 1, height: 50, fontSize: 16, color: '#333' },
+  inputRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  quantityInput: { flex: 2, marginRight: 10 },
+  unitInput: { flex: 1 },
   quickActionsContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
   quickActionButton: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#f2f2f2', borderRadius: 10 },
   quickActionButtonText: { fontSize: 16, color: '#007AFF', fontWeight: '600' },
@@ -295,7 +335,7 @@ const styles = StyleSheet.create({
   buttonText: { color: 'white', fontSize: 18, fontWeight: '600' },
   cancelButton: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#007AFF' },
   cancelButtonText: { color: '#007AFF' },
-  addButtonContainer: { padding: 20, borderTopWidth: 1, borderTopColor: '#eee', backgroundColor: '#fff' },
+  addButtonContainer: { paddingHorizontal: 20, paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#eee', backgroundColor: '#fff', position: 'absolute', bottom: 0, left: 0, right: 0 },
   addButton: { backgroundColor: '#007AFF', paddingVertical: 15, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   addButtonText: { color: 'white', fontSize: 18, fontWeight: '600', marginLeft: 8 },
 });
