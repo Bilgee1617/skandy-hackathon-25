@@ -7,6 +7,7 @@ import {
     KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { User } from '@supabase/supabase-js';
 
 interface Ingredient {
   id: string;
@@ -67,6 +68,7 @@ const parseInputDate = (dateString: string) => {
 export default function IngredientsScreen() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
@@ -81,13 +83,29 @@ export default function IngredientsScreen() {
   const [newItemBoughtOn, setNewItemBoughtOn] = useState('');
 
   useEffect(() => {
-    fetchIngredients();
+    const fetchUser = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            setUser(session.user);
+        }
+    };
+    fetchUser();
   }, []);
 
+  useEffect(() => {
+    if (user) {
+        fetchIngredients();
+    }
+  }, [user]);
+
   const fetchIngredients = async () => {
-    if(loading) return;
+    if(loading || !user) return;
     setLoading(true);
-    const { data, error } = await supabase.from('ingredients').select('*').order('expiration_date', { ascending: true, nullsFirst: false });
+    const { data, error } = await supabase
+        .from('ingredients')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('expiration_date', { ascending: true, nullsFirst: false });
     if (error) Alert.alert('Error fetching ingredients', error.message);
     else setIngredients(data as Ingredient[]);
     setLoading(false);
@@ -135,8 +153,8 @@ export default function IngredientsScreen() {
   const handleCloseAddModal = () => setAddModalVisible(false);
 
   const handleAddItem = async () => {
-    if (!newItemName.trim()) {
-        Alert.alert('Missing Name', 'Please enter a name for the ingredient.');
+    if (!newItemName.trim() || !user) {
+        Alert.alert('Missing Name or User', 'Please enter a name for the ingredient and be logged in.');
         return;
     }
     const quantityValue = parseFloat(newItemQuantity);
@@ -157,12 +175,6 @@ export default function IngredientsScreen() {
         return;
     }
 
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-        Alert.alert('Not Authenticated', 'You must be logged in to add an ingredient.');
-        return;
-    }
     setLoading(true);
     const { error } = await supabase.from('ingredients').insert([{
         name: newItemName.trim(),
@@ -170,7 +182,7 @@ export default function IngredientsScreen() {
         unit: newItemUnit.trim(),
         expiration_date: expDateISO,
         bought_on: boughtOnISO,
-        user_id: session.user.id,
+        user_id: user.id,
     }]);
     if (error) Alert.alert('Error adding ingredient', error.message);
     else { await fetchIngredients(); handleCloseAddModal(); }
