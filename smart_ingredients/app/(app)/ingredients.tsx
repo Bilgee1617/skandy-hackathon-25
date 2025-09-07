@@ -6,6 +6,7 @@ import {
     SafeAreaView, TouchableOpacity, Modal, TextInput, 
     KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Ingredient {
   id: string;
@@ -44,6 +45,7 @@ export default function IngredientsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<Ingredient | null>(null);
   const [newQuantity, setNewQuantity] = useState('');
+  const [newUnit, setNewUnit] = useState('');
 
   useEffect(() => {
     fetchIngredients();
@@ -67,6 +69,7 @@ export default function IngredientsScreen() {
   const handleOpenModal = (ingredient: Ingredient) => {
     setSelectedIngredient(ingredient);
     setNewQuantity(ingredient.quantity.toString());
+    setNewUnit(ingredient.unit || '');
     setModalVisible(true);
   };
 
@@ -74,9 +77,10 @@ export default function IngredientsScreen() {
     setModalVisible(false);
     setSelectedIngredient(null);
     setNewQuantity('');
+    setNewUnit('');
   };
 
-  const handleUpdateQuantity = async () => {
+  const handleSave = async () => {
     if (!selectedIngredient) return;
 
     const quantityValue = parseFloat(newQuantity);
@@ -86,13 +90,26 @@ export default function IngredientsScreen() {
     }
 
     setLoading(true);
-    const { error } = await supabase
-      .from('ingredients')
-      .update({ quantity: quantityValue })
-      .eq('id', selectedIngredient.id);
+    let error;
+
+    if (quantityValue <= 0) {
+        // If quantity is 0 or less, delete the ingredient
+        const { error: deleteError } = await supabase
+            .from('ingredients')
+            .delete()
+            .eq('id', selectedIngredient.id);
+        error = deleteError;
+    } else {
+        // Otherwise, update the quantity and unit
+        const { error: updateError } = await supabase
+            .from('ingredients')
+            .update({ quantity: quantityValue, unit: newUnit })
+            .eq('id', selectedIngredient.id);
+        error = updateError;
+    }
 
     if (error) {
-      Alert.alert('Error updating quantity', error.message);
+      Alert.alert('Error saving ingredient', error.message);
     } else {
         await fetchIngredients();
         handleCloseModal();
@@ -120,6 +137,14 @@ export default function IngredientsScreen() {
     );
   };
 
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+        <Ionicons name="basket-outline" size={80} color="#ccc" />
+        <Text style={styles.emptyTitle}>Pantry's empty!</Text>
+        <Text style={styles.emptySubtitle}>Time for a grocery run?</Text>
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
         <View style={styles.header}>
@@ -132,8 +157,8 @@ export default function IngredientsScreen() {
         keyExtractor={(item) => item.id}
         onRefresh={fetchIngredients}
         refreshing={loading}
-        ListEmptyComponent={<Text style={styles.emptyText}>No ingredients yet. Go shopping!</Text>}
-        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={renderEmptyState}
+        contentContainerStyle={ingredients.length === 0 ? styles.flexOne : styles.listContent}
         keyboardShouldPersistTaps="handled"
       />
 
@@ -152,15 +177,21 @@ export default function IngredientsScreen() {
                 <View style={styles.modalContent}>
                     <Text style={styles.modalTitle}>{selectedIngredient?.name}</Text>
 
-                    <View style={styles.inputContainer}>
+                    <View style={styles.inputRow}>
                         <TextInput
-                            style={styles.input}
+                            style={styles.quantityInput}
                             onChangeText={setNewQuantity}
                             value={newQuantity}
                             keyboardType="numeric"
-                            placeholder="Enter quantity"
+                            placeholder="Quantity"
                         />
-                        <Text style={styles.unitText}>{selectedIngredient?.unit}</Text>
+                        <TextInput
+                            style={styles.unitInput}
+                            onChangeText={setNewUnit}
+                            value={newUnit}
+                            placeholder="Unit"
+                            autoCapitalize="none"
+                        />
                     </View>
 
                     <View style={styles.quickActionsContainer}>
@@ -169,7 +200,7 @@ export default function IngredientsScreen() {
                         <TouchableOpacity style={styles.quickActionButton} onPress={() => setNewQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity style={styles.button} onPress={handleUpdateQuantity} disabled={loading}>
+                    <TouchableOpacity style={styles.button} onPress={handleSave} disabled={loading}>
                         <Text style={styles.buttonText}>Save</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseModal}>
@@ -242,11 +273,23 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     paddingLeft: 10,
   },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: 50,
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#555',
+    marginTop: 15,
+  },
+  emptySubtitle: {
     fontSize: 16,
-    color: '#999',
+    color: '#888',
+    textAlign: 'center',
+    marginTop: 5,
   },
   modalOverlay: {
     flex: 1,
@@ -262,7 +305,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-    paddingBottom: 30, // Add padding for home bar
+    paddingBottom: 30,
   },
   modalTitle: {
     fontSize: 22,
@@ -270,22 +313,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
-  inputContainer: {
+  inputRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    marginBottom: 15,
+  },
+  quantityInput: {
+    flex: 2,
     backgroundColor: '#f2f2f2',
     borderRadius: 10,
-    marginBottom: 15,
     paddingHorizontal: 15,
-  },
-  input: {
-    flex: 1,
     height: 50,
     fontSize: 18,
   },
-  unitText: {
+  unitInput: {
+    flex: 1,
+    backgroundColor: '#f2f2f2',
+    borderRadius: 10,
+    paddingHorizontal: 15,
+    height: 50,
     fontSize: 18,
-    color: '#666',
     marginLeft: 10,
   },
   quickActionsContainer: {
