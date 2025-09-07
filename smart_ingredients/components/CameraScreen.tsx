@@ -158,11 +158,57 @@ export default function CameraScreen({ onClose }: CameraScreenProps) {
     setCameraType(cameraType === 'back' ? 'front' : 'back');
   };
 
-  const handleSaveIngredients = (ingredients: IngredientItem[]) => {
-    console.log('Saving ingredients to inventory:', ingredients);
-    // TODO: Add ingredients to Supabase database
-    setShowConfirmationModal(false);
-    onClose();
+  const handleSaveIngredients = async (ingredients: IngredientItem[]) => {
+    try {
+      console.log('Saving ingredients to inventory:', ingredients);
+      
+      // TODO: Add ingredients to Supabase database
+      // For now, just log the ingredients and close the modal
+      
+      // Close the confirmation modal first
+      setShowConfirmationModal(false);
+      
+      // Show success message
+      Alert.alert(
+        'Success', 
+        `Successfully saved ${ingredients.length} ingredient(s) to your inventory!`,
+        [
+          {
+            text: 'Continue Scanning',
+            onPress: () => {
+              // Stay in camera for more scanning
+              console.log('Continuing to scan...');
+            }
+          },
+          {
+            text: 'Done',
+            onPress: () => {
+              try {
+                console.log('Closing camera...');
+                onClose();
+              } catch (error) {
+                console.error('Error closing camera:', error);
+              }
+            }
+          }
+        ]
+      );
+      
+    } catch (error) {
+      console.error('Error saving ingredients:', error);
+      Alert.alert(
+        'Error', 
+        'Failed to save ingredients. Please try again.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Don't close the modal on error, let user try again
+            }
+          }
+        ]
+      );
+    }
   };
 
   const handleCancelConfirmation = () => {

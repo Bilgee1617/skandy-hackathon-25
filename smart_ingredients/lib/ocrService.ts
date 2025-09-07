@@ -2,6 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import { createWorker } from 'tesseract.js';
 import { getOCRConfig, isGoogleVisionConfigured, GOOGLE_VISION_CONFIG } from './ocrConfig';
 import { analyzeReceiptText, ReceiptAnalysis } from './smartIngredientDetector';
+import { processIngredientsWithGPT, getFallbackIngredients, GPTIngredient } from './gptService';
 
 export interface DetectedIngredient {
   name: string;
@@ -323,32 +324,47 @@ export async function extractTextFromReceipt(imageUri: string): Promise<OCRResul
     
     console.log('OCR extracted text length:', extractedText.length);
     
-    // Use smart ingredient detection
-    console.log('Analyzing receipt with smart ingredient detection...');
-    const smartAnalysis = analyzeReceiptText(extractedText);
-    console.log('Smart analysis completed:', {
-      ingredientsFound: smartAnalysis.ingredients.length,
-      confidence: smartAnalysis.confidence,
-      storeInfo: smartAnalysis.storeInfo.length,
-      prices: smartAnalysis.prices.length
-    });
+    // Use GPT for intelligent ingredient processing
+    console.log('Processing ingredients with GPT...');
+    let gptIngredients: GPTIngredient[] = [];
+    let detectedIngredients: DetectedIngredient[] = [];
+    
+    try {
+      const gptResponse = await processIngredientsWithGPT(extractedText);
+      gptIngredients = gptResponse.ingredients;
+      console.log('GPT processing completed:', {
+        ingredientsFound: gptIngredients.length,
+        processingTime: gptResponse.processingTime,
+        model: gptResponse.model
+      });
+      
+      // Convert GPT ingredients to detected ingredients format
+      detectedIngredients = gptIngredients.map(ing => ({
+        name: ing.name,
+        confidence: ing.confidence,
+      }));
+      
+    } catch (gptError) {
+      console.error('GPT processing failed, using fallback:', gptError);
+      
+      // Fallback to smart ingredient detection if GPT fails
+      console.log('Falling back to smart ingredient detection...');
+      const smartAnalysis = analyzeReceiptText(extractedText);
+      detectedIngredients = smartAnalysis.ingredients.map(ing => ({
+        name: ing.name,
+        confidence: ing.confidence,
+      }));
+    }
     
     // Extract ingredient names for backward compatibility
-    const ingredients = smartAnalysis.ingredients.map(ing => ing.name);
+    const ingredients = detectedIngredients.map(ing => ing.name);
     console.log('Found ingredients:', ingredients);
-    
-    // Create detected ingredients with confidence scores
-    const detectedIngredients: DetectedIngredient[] = smartAnalysis.ingredients.map(ing => ({
-      name: ing.name,
-      confidence: ing.confidence,
-    }));
     
     return {
       text: extractedText,
-      confidence: Math.max(confidence, smartAnalysis.confidence),
+      confidence: confidence,
       ingredients: ingredients,
       detectedIngredients: detectedIngredients,
-      smartAnalysis: smartAnalysis,
     };
   } catch (error) {
     console.error('Error in real OCR processing:', error);
@@ -387,14 +403,38 @@ export async function extractTextFromReceiptMock(imageUri: string): Promise<OCRR
     Total: $25.99
   `;
     
-    console.log('Extracting ingredients from mock text...');
-    const ingredients = extractIngredients(mockReceiptText);
+    console.log('Processing mock text with GPT...');
+    let detectedIngredients: DetectedIngredient[] = [];
+    let ingredients: string[] = [];
+    
+    try {
+      const gptResponse = await processIngredientsWithGPT(mockReceiptText);
+      detectedIngredients = gptResponse.ingredients.map(ing => ({
+        name: ing.name,
+        confidence: ing.confidence,
+      }));
+      ingredients = detectedIngredients.map(ing => ing.name);
+      console.log('GPT mock processing completed:', {
+        ingredientsFound: ingredients.length,
+        processingTime: gptResponse.processingTime
+      });
+    } catch (gptError) {
+      console.error('GPT mock processing failed, using fallback:', gptError);
+      // Fallback to simple extraction
+      ingredients = extractIngredients(mockReceiptText);
+      detectedIngredients = ingredients.map(ing => ({
+        name: ing,
+        confidence: 0.8,
+      }));
+    }
+    
     console.log('Found ingredients:', ingredients);
     
     const result = {
       text: mockReceiptText,
       confidence: 0.85,
       ingredients: ingredients,
+      detectedIngredients: detectedIngredients,
     };
     
     console.log('Mock OCR result:', result);

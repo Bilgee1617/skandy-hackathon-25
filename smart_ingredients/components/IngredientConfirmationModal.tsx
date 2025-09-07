@@ -110,35 +110,47 @@ export default function IngredientConfirmationModal({
   };
 
   const validateAndSave = () => {
-    const selectedIngredients = ingredients.filter(ingredient => ingredient.isSelected);
-    
-    // Validation
-    const errors: string[] = [];
-    
-    selectedIngredients.forEach((ingredient, index) => {
-      if (!ingredient.name.trim()) {
-        errors.push(`Item ${index + 1}: Name is required`);
+    try {
+      const selectedIngredients = ingredients.filter(ingredient => ingredient.isSelected);
+      
+      if (selectedIngredients.length === 0) {
+        Alert.alert('No Items Selected', 'Please select at least one ingredient to save.');
+        return;
       }
-      if (ingredient.quantity <= 0) {
-        errors.push(`Item ${index + 1}: Quantity must be greater than 0`);
-      }
-    });
+      
+      // Validation
+      const errors: string[] = [];
+      
+      selectedIngredients.forEach((ingredient, index) => {
+        if (!ingredient.name.trim()) {
+          errors.push(`Item ${index + 1}: Name is required`);
+        }
+        if (ingredient.quantity <= 0) {
+          errors.push(`Item ${index + 1}: Quantity must be greater than 0`);
+        }
+      });
 
-    if (errors.length > 0) {
-      Alert.alert('Validation Error', errors.join('\n'));
-      return;
+      if (errors.length > 0) {
+        Alert.alert('Validation Error', errors.join('\n'));
+        return;
+      }
+
+      // Normalize units and merge duplicates
+      const normalizedIngredients = selectedIngredients.map(ingredient => ({
+        ...ingredient,
+        unit: normalizeUnit(ingredient.unit),
+      }));
+
+      // Merge duplicates (same name + unit) by summing quantities
+      const mergedIngredients = mergeDuplicates(normalizedIngredients);
+
+      console.log('Validated ingredients:', mergedIngredients);
+      onSave(mergedIngredients);
+      
+    } catch (error) {
+      console.error('Error in validateAndSave:', error);
+      Alert.alert('Error', 'An error occurred while saving ingredients. Please try again.');
     }
-
-    // Normalize units and merge duplicates
-    const normalizedIngredients = selectedIngredients.map(ingredient => ({
-      ...ingredient,
-      unit: normalizeUnit(ingredient.unit),
-    }));
-
-    // Merge duplicates (same name + unit) by summing quantities
-    const mergedIngredients = mergeDuplicates(normalizedIngredients);
-
-    onSave(mergedIngredients);
   };
 
   const mergeDuplicates = (ingredients: IngredientItem[]): IngredientItem[] => {
@@ -163,24 +175,33 @@ export default function IngredientConfirmationModal({
   };
 
   const normalizeUnit = (unit: string): string => {
-    const unitMap: Record<string, string> = {
-      'each': 'ea',
-      'piece': 'ea',
-      'pound': 'lb',
-      'pounds': 'lb',
-      'ounce': 'oz',
-      'ounces': 'oz',
-      'gram': 'g',
-      'grams': 'g',
-      'kilogram': 'kg',
-      'kilograms': 'kg',
-      'milliliter': 'ml',
-      'milliliters': 'ml',
-      'liter': 'L',
-      'liters': 'L',
-    };
-    
-    return unitMap[unit.toLowerCase()] || unit;
+    try {
+      if (!unit || typeof unit !== 'string') {
+        return 'ea'; // Default unit
+      }
+      
+      const unitMap: Record<string, string> = {
+        'each': 'ea',
+        'piece': 'ea',
+        'pound': 'lb',
+        'pounds': 'lb',
+        'ounce': 'oz',
+        'ounces': 'oz',
+        'gram': 'g',
+        'grams': 'g',
+        'kilogram': 'kg',
+        'kilograms': 'kg',
+        'milliliter': 'ml',
+        'milliliters': 'ml',
+        'liter': 'L',
+        'liters': 'L',
+      };
+      
+      return unitMap[unit.toLowerCase()] || unit;
+    } catch (error) {
+      console.error('Error in normalizeUnit:', error);
+      return 'ea'; // Default fallback
+    }
   };
 
   const selectedCount = ingredients.filter(i => i.isSelected).length;
