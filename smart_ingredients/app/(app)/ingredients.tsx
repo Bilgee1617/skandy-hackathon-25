@@ -9,6 +9,108 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { User } from '@supabase/supabase-js';
 
+// Function to get food emoji and color based on ingredient name
+const getIngredientTheme = (ingredientName: string) => {
+  const name = ingredientName.toLowerCase();
+  
+  // Fruits
+  if (name.includes('apple') || name.includes('banana') || name.includes('orange') || name.includes('grape') || name.includes('strawberry') || name.includes('berry')) {
+    return { emoji: '🍎', color: '#FF6B6B', category: 'fruit' };
+  }
+  if (name.includes('lemon') || name.includes('lime') || name.includes('citrus')) {
+    return { emoji: '🍋', color: '#FFD93D', category: 'fruit' };
+  }
+  if (name.includes('avocado') || name.includes('olive')) {
+    return { emoji: '🥑', color: '#6BCF7F', category: 'fruit' };
+  }
+  
+  // Vegetables
+  if (name.includes('carrot') || name.includes('pumpkin') || name.includes('sweet potato')) {
+    return { emoji: '🥕', color: '#FF8C42', category: 'vegetable' };
+  }
+  if (name.includes('tomato') || name.includes('cherry')) {
+    return { emoji: '🍅', color: '#FF4757', category: 'vegetable' };
+  }
+  if (name.includes('lettuce') || name.includes('spinach') || name.includes('kale') || name.includes('green')) {
+    return { emoji: '🥬', color: '#2ED573', category: 'vegetable' };
+  }
+  if (name.includes('onion') || name.includes('garlic') || name.includes('shallot')) {
+    return { emoji: '🧅', color: '#FFA502', category: 'vegetable' };
+  }
+  if (name.includes('pepper') || name.includes('bell pepper') || name.includes('chili')) {
+    return { emoji: '🌶️', color: '#FF6348', category: 'vegetable' };
+  }
+  if (name.includes('cucumber') || name.includes('pickle')) {
+    return { emoji: '🥒', color: '#2ED573', category: 'vegetable' };
+  }
+  if (name.includes('mushroom') || name.includes('fungus')) {
+    return { emoji: '🍄', color: '#8B4513', category: 'vegetable' };
+  }
+  
+  // Dairy
+  if (name.includes('milk') || name.includes('cream') || name.includes('butter')) {
+    return { emoji: '🥛', color: '#F8F9FA', category: 'dairy' };
+  }
+  if (name.includes('cheese') || name.includes('cheddar') || name.includes('mozzarella')) {
+    return { emoji: '🧀', color: '#FFD700', category: 'dairy' };
+  }
+  if (name.includes('yogurt') || name.includes('greek')) {
+    return { emoji: '🥛', color: '#E8F4FD', category: 'dairy' };
+  }
+  if (name.includes('egg') || name.includes('eggs')) {
+    return { emoji: '🥚', color: '#FFF8DC', category: 'dairy' };
+  }
+  
+  // Meat & Protein
+  if (name.includes('chicken') || name.includes('poultry')) {
+    return { emoji: '🍗', color: '#FF6B6B', category: 'meat' };
+  }
+  if (name.includes('beef') || name.includes('steak') || name.includes('burger')) {
+    return { emoji: '🥩', color: '#8B0000', category: 'meat' };
+  }
+  if (name.includes('fish') || name.includes('salmon') || name.includes('tuna')) {
+    return { emoji: '🐟', color: '#4682B4', category: 'meat' };
+  }
+  if (name.includes('bacon') || name.includes('ham') || name.includes('pork')) {
+    return { emoji: '🥓', color: '#CD853F', category: 'meat' };
+  }
+  
+  // Grains & Bread
+  if (name.includes('bread') || name.includes('toast') || name.includes('bagel')) {
+    return { emoji: '🍞', color: '#DEB887', category: 'grain' };
+  }
+  if (name.includes('rice') || name.includes('pasta') || name.includes('noodle')) {
+    return { emoji: '🍚', color: '#F5DEB3', category: 'grain' };
+  }
+  if (name.includes('flour') || name.includes('wheat') || name.includes('oats')) {
+    return { emoji: '🌾', color: '#D2B48C', category: 'grain' };
+  }
+  
+  // Nuts & Seeds
+  if (name.includes('nut') || name.includes('almond') || name.includes('walnut') || name.includes('peanut')) {
+    return { emoji: '🥜', color: '#8B4513', category: 'nuts' };
+  }
+  
+  // Herbs & Spices
+  if (name.includes('basil') || name.includes('oregano') || name.includes('thyme') || name.includes('herb')) {
+    return { emoji: '🌿', color: '#228B22', category: 'herbs' };
+  }
+  if (name.includes('salt') || name.includes('pepper') || name.includes('spice')) {
+    return { emoji: '🧂', color: '#F5F5F5', category: 'spices' };
+  }
+  
+  // Beverages
+  if (name.includes('juice') || name.includes('soda') || name.includes('drink')) {
+    return { emoji: '🥤', color: '#FF69B4', category: 'beverage' };
+  }
+  if (name.includes('coffee') || name.includes('tea')) {
+    return { emoji: '☕', color: '#8B4513', category: 'beverage' };
+  }
+  
+  // Default
+  return { emoji: '🥘', color: '#95A5A6', category: 'other' };
+};
+
 interface Ingredient {
   id: string;
   name: string;
@@ -191,15 +293,29 @@ export default function IngredientsScreen() {
 
   const renderItem = ({ item }: { item: Ingredient }) => {
     const expiration = getExpirationInfo(item.expiration_date);
+    const theme = getIngredientTheme(item.name);
+    
     return (
       <TouchableOpacity onPress={() => handleOpenEditModal(item)}>
-          <View style={styles.itemContainer}>
+          <View style={[styles.itemContainer, { backgroundColor: theme.color + '15' }]}>
+            <View style={styles.itemIconContainer}>
+              <View style={[styles.itemIcon, { backgroundColor: theme.color + '20' }]}>
+                <Text style={styles.itemEmoji}>{theme.emoji}</Text>
+              </View>
+            </View>
+            
             <View style={styles.itemDetails}>
               <Text style={styles.itemName}>{item.name}</Text>
               <Text style={[styles.itemDate, { color: expiration.color, fontWeight: 'bold' }]}>{expiration.text}</Text>
               <Text style={styles.itemSubDate}>({formatDisplayDate(item.expiration_date)})</Text>
             </View>
-            {item.quantity != null && item.unit && <Text style={styles.itemQuantity}>{`${item.quantity} ${item.unit}`}</Text>}
+            
+            <View style={styles.itemQuantityContainer}>
+              {item.quantity != null && item.unit && (
+                <Text style={[styles.itemQuantity, { color: theme.color }]}>{`${item.quantity} ${item.unit}`}</Text>
+              )}
+              <Ionicons name="chevron-forward" size={16} color="#ccc" />
+            </View>
           </View>
       </TouchableOpacity>
     );
@@ -304,12 +420,62 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: 'bold', color: '#333' },
   subtitle: { fontSize: 16, color: '#666', marginTop: 5 },
   listContent: { paddingHorizontal: 20, paddingBottom: 100 },
-  itemContainer: { backgroundColor: '#f9f9f9', padding: 15, borderRadius: 10, marginVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  itemDetails: { flex: 1 },
-  itemName: { fontSize: 18, fontWeight: '500', marginBottom: 4 },
-  itemDate: { fontSize: 14 },
-  itemSubDate: { fontSize: 12, color: '#888' },
-  itemQuantity: { fontSize: 16, fontWeight: 'bold', color: '#007AFF', paddingLeft: 10 },
+  itemContainer: { 
+    padding: 16, 
+    borderRadius: 16, 
+    marginVertical: 8, 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  itemIconContainer: {
+    marginRight: 16,
+  },
+  itemIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  itemEmoji: {
+    fontSize: 24,
+  },
+  itemDetails: { 
+    flex: 1,
+    marginRight: 12,
+  },
+  itemName: { 
+    fontSize: 18, 
+    fontWeight: '600', 
+    marginBottom: 4,
+    color: '#333',
+  },
+  itemDate: { 
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  itemSubDate: { 
+    fontSize: 12, 
+    color: '#888' 
+  },
+  itemQuantityContainer: {
+    alignItems: 'flex-end',
+  },
+  itemQuantity: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    marginBottom: 4,
+  },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   emptyTitle: { fontSize: 22, fontWeight: 'bold', color: '#555', marginTop: 15 },
   emptySubtitle: { fontSize: 16, color: '#888', textAlign: 'center', marginTop: 5 },
