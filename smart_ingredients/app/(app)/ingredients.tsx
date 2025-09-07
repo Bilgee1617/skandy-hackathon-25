@@ -1,7 +1,11 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { StyleSheet, View, Text, FlatList, Alert, SafeAreaView, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { 
+    StyleSheet, View, Text, FlatList, Alert, 
+    SafeAreaView, TouchableOpacity, Modal, TextInput, 
+    KeyboardAvoidingView, TouchableWithoutFeedback, Keyboard, Platform
+} from 'react-native';
 
 interface Ingredient {
   id: string;
@@ -90,7 +94,7 @@ export default function IngredientsScreen() {
     if (error) {
       Alert.alert('Error updating quantity', error.message);
     } else {
-        await fetchIngredients(); // Refresh list
+        await fetchIngredients();
         handleCloseModal();
     }
     setLoading(false);
@@ -130,50 +134,60 @@ export default function IngredientsScreen() {
         refreshing={loading}
         ListEmptyComponent={<Text style={styles.emptyText}>No ingredients yet. Go shopping!</Text>}
         contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
       />
 
-      {/* --- Edit Quantity Modal --- */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={modalVisible}
         onRequestClose={handleCloseModal}
       >
-        <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>{selectedIngredient?.name}</Text>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.flexOne}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContent}>
+                    <Text style={styles.modalTitle}>{selectedIngredient?.name}</Text>
 
-                <View style={styles.inputContainer}>
-                    <TextInput
-                        style={styles.input}
-                        onChangeText={setNewQuantity}
-                        value={newQuantity}
-                        keyboardType="numeric"
-                        placeholder="Enter quantity"
-                    />
-                    <Text style={styles.unitText}>{selectedIngredient?.unit}</Text>
+                    <View style={styles.inputContainer}>
+                        <TextInput
+                            style={styles.input}
+                            onChangeText={setNewQuantity}
+                            value={newQuantity}
+                            keyboardType="numeric"
+                            placeholder="Enter quantity"
+                        />
+                        <Text style={styles.unitText}>{selectedIngredient?.unit}</Text>
+                    </View>
+
+                    <View style={styles.quickActionsContainer}>
+                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setNewQuantity(q => String(Math.max(0, parseFloat(q || '0') - 1)))}><Text style={styles.quickActionButtonText}>-1</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setNewQuantity('0' )}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
+                        <TouchableOpacity style={styles.quickActionButton} onPress={() => setNewQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity style={styles.button} onPress={handleUpdateQuantity} disabled={loading}>
+                        <Text style={styles.buttonText}>Save</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseModal}>
+                        <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
+                    </TouchableOpacity>
                 </View>
-
-                <View style={styles.quickActionsContainer}>
-                    <TouchableOpacity style={styles.quickActionButton} onPress={() => setNewQuantity(q => String(Math.max(0, parseFloat(q || '0') - 1)))}><Text style={styles.quickActionButtonText}>-1</Text></TouchableOpacity>
-                    <TouchableOpacity style={styles.quickActionButton} onPress={() => setNewQuantity('0' )}><Text style={styles.quickActionButtonText}>Use All</Text></TouchableOpacity>
-                    <TouchableOpacity style={styles.quickActionButton} onPress={() => setNewQuantity(q => String(parseFloat(q || '0') + 1))}><Text style={styles.quickActionButtonText}>+1</Text></TouchableOpacity>
-                </View>
-
-                <TouchableOpacity style={styles.button} onPress={handleUpdateQuantity} disabled={loading}>
-                    <Text style={styles.buttonText}>Save</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={handleCloseModal}>
-                    <Text style={[styles.buttonText, styles.cancelButtonText]}>Cancel</Text>
-                </TouchableOpacity>
             </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  flexOne: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -234,7 +248,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
   },
-  // Modal Styles
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -249,6 +262,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
+    paddingBottom: 30, // Add padding for home bar
   },
   modalTitle: {
     fontSize: 22,
@@ -290,7 +304,6 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '600',
   },
-  // Button styles from login.tsx
   button: {
     backgroundColor: '#007AFF',
     width: '100%',
