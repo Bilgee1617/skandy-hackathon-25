@@ -49,7 +49,7 @@
     ],
     "scheme": "nurtree",
     "extra": {
-      "googleVisionApiKey": "AIzaSyDplYITl1QVNP657IVyAfmafDDvT-6eMCs",
+      "googleVisionApiKey": "",
       "openaiApiKey": "your_openai_api_key_here"
     }
   }
